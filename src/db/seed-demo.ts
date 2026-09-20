@@ -12,7 +12,10 @@ import {
   stockMovements,
 } from "./schema";
 import { sql } from "drizzle-orm";
-import { calculatePurchaseWeight, calculatePurchaseAmount } from "@/lib/calculations/purchasing";
+import {
+  calculatePurchaseWeight,
+  calculatePurchaseAmount,
+} from "@/lib/calculations/purchasing";
 
 async function main() {
   const existingWarehouses = await db.select().from(warehouses);
@@ -30,66 +33,221 @@ async function main() {
 
   if (existingProducts.length === 0) {
     await db.insert(products).values([
-      { code: "BB-001", name: "Ketela Segar", type: "RAW_MATERIAL", unit: "Kg", defaultPrice: "1500" },
-      { code: "BB-002", name: "Ketela Grade A", type: "RAW_MATERIAL", unit: "Kg", defaultPrice: "1700" },
-      { code: "BB-003", name: "Ketela Grade B", type: "RAW_MATERIAL", unit: "Kg", defaultPrice: "1400" },
-      { code: "FG-001", name: "Tepung Tapioka", type: "FINISHED_GOOD", unit: "Kg", defaultPrice: "10000" },
-      { code: "BP-001", name: "Ampas Tapioka", type: "BY_PRODUCT", unit: "Kg", defaultPrice: "500" },
-      { code: "PK-001", name: "Sak Kemasan 50Kg", type: "PACKAGING", unit: "Sak", defaultPrice: "3500" },
+      {
+        code: "BB-001",
+        name: "Ketela Segar",
+        type: "RAW_MATERIAL",
+        unit: "Kg",
+        defaultPrice: "1500",
+      },
+      {
+        code: "BB-002",
+        name: "Ketela Grade A",
+        type: "RAW_MATERIAL",
+        unit: "Kg",
+        defaultPrice: "1700",
+      },
+      {
+        code: "BB-003",
+        name: "Ketela Grade B",
+        type: "RAW_MATERIAL",
+        unit: "Kg",
+        defaultPrice: "1400",
+      },
+      {
+        code: "FG-001",
+        name: "Tepung Tapioka",
+        type: "FINISHED_GOOD",
+        unit: "Kg",
+        defaultPrice: "10000",
+      },
+      {
+        code: "BP-001",
+        name: "Ampas Tapioka",
+        type: "BY_PRODUCT",
+        unit: "Kg",
+        defaultPrice: "500",
+      },
+      {
+        code: "PK-001",
+        name: "Sak Kemasan 50Kg",
+        type: "PACKAGING",
+        unit: "Sak",
+        defaultPrice: "3500",
+      },
     ]);
   }
 
   if (existingSuppliers.length === 0) {
     await db.insert(suppliers).values([
-      { code: "SUP-001", name: "Bapak Sukarya", type: "Petani", phone: "081234567801", address: "Desa Sukamaju" },
-      { code: "SUP-002", name: "Pengepul Tani Jaya", type: "Pengepul", phone: "081234567802", address: "Kec. Cibadak" },
-      { code: "SUP-003", name: "CV Ketela Makmur", type: "Distributor", phone: "081234567803", address: "Kab. Subang" },
-      { code: "SUP-004", name: "Bapak Warsito", type: "Petani", phone: "081234567804", address: "Desa Mekarsari" },
-      { code: "SUP-005", name: "Kelompok Tani Sumber Rejeki", type: "Petani", phone: "081234567805", address: "Desa Cikarang" },
+      {
+        code: "SUP-001",
+        name: "Bapak Sukarya",
+        type: "Petani",
+        phone: "081234567801",
+        address: "Desa Sukamaju",
+      },
+      {
+        code: "SUP-002",
+        name: "Pengepul Tani Jaya",
+        type: "Pengepul",
+        phone: "081234567802",
+        address: "Kec. Cibadak",
+      },
+      {
+        code: "SUP-003",
+        name: "CV Ketela Makmur",
+        type: "Distributor",
+        phone: "081234567803",
+        address: "Kab. Subang",
+      },
+      {
+        code: "SUP-004",
+        name: "Bapak Warsito",
+        type: "Petani",
+        phone: "081234567804",
+        address: "Desa Mekarsari",
+      },
+      {
+        code: "SUP-005",
+        name: "Kelompok Tani Sumber Rejeki",
+        type: "Petani",
+        phone: "081234567805",
+        address: "Desa Cikarang",
+      },
     ]);
   }
 
   const existingCustomers = await db.select().from(customers);
   if (existingCustomers.length === 0) {
     await db.insert(customers).values([
-      { code: "CUS-001", name: "PT Pangan Nusantara", phone: "0217770001", address: "Jakarta", creditLimit: "50000000", termDays: 30 },
-      { code: "CUS-002", name: "UD Berkah Jaya", phone: "0217770002", address: "Bandung", creditLimit: "20000000", termDays: 14 },
-      { code: "CUS-003", name: "Toko Sembako Sejahtera", phone: "0217770003", address: "Cirebon", creditLimit: "10000000", termDays: 7 },
+      {
+        code: "CUS-001",
+        name: "PT Pangan Nusantara",
+        phone: "0217770001",
+        address: "Jakarta",
+        creditLimit: "50000000",
+        termDays: 30,
+      },
+      {
+        code: "CUS-002",
+        name: "UD Berkah Jaya",
+        phone: "0217770002",
+        address: "Bandung",
+        creditLimit: "20000000",
+        termDays: 14,
+      },
+      {
+        code: "CUS-003",
+        name: "Toko Sembako Sejahtera",
+        phone: "0217770003",
+        address: "Cirebon",
+        creditLimit: "10000000",
+        termDays: 7,
+      },
     ]);
   }
 
   const existingVehicles = await db.select().from(vehicles);
   if (existingVehicles.length === 0) {
     await db.insert(vehicles).values([
-      { code: "TRK-001", policeNumber: "B 9123 KTA", brand: "Hino", type: "Truk Engkel", capacity: "8000", ownership: "Milik Sendiri" },
-      { code: "TRK-002", policeNumber: "B 9876 KTB", brand: "Mitsubishi", type: "Truk Fuso", capacity: "15000", ownership: "Milik Sendiri" },
-      { code: "TRK-003", policeNumber: "B 9345 KTC", brand: "Isuzu", type: "Truk Engkel", capacity: "7000", ownership: "Sewa" },
+      {
+        code: "TRK-001",
+        policeNumber: "B 9123 KTA",
+        brand: "Hino",
+        type: "Truk Engkel",
+        capacity: "8000",
+        ownership: "Milik Sendiri",
+      },
+      {
+        code: "TRK-002",
+        policeNumber: "B 9876 KTB",
+        brand: "Mitsubishi",
+        type: "Truk Fuso",
+        capacity: "15000",
+        ownership: "Milik Sendiri",
+      },
+      {
+        code: "TRK-003",
+        policeNumber: "B 9345 KTC",
+        brand: "Isuzu",
+        type: "Truk Engkel",
+        capacity: "7000",
+        ownership: "Sewa",
+      },
     ]);
   }
 
   const existingDrivers = await db.select().from(drivers);
   if (existingDrivers.length === 0) {
     await db.insert(drivers).values([
-      { code: "DRV-001", name: "Slamet Riyadi", phone: "081300000001", licenseNumber: "SIM-A-001", licenseType: "A" },
-      { code: "DRV-002", name: "Budi Santoso", phone: "081300000002", licenseNumber: "SIM-A-002", licenseType: "A" },
-      { code: "DRV-003", name: "Agus Setiawan", phone: "081300000003", licenseNumber: "SIM-B1-003", licenseType: "B1" },
+      {
+        code: "DRV-001",
+        name: "Slamet Riyadi",
+        phone: "081300000001",
+        licenseNumber: "SIM-A-001",
+        licenseType: "A",
+      },
+      {
+        code: "DRV-002",
+        name: "Budi Santoso",
+        phone: "081300000002",
+        licenseNumber: "SIM-A-002",
+        licenseType: "A",
+      },
+      {
+        code: "DRV-003",
+        name: "Agus Setiawan",
+        phone: "081300000003",
+        licenseNumber: "SIM-B1-003",
+        licenseType: "B1",
+      },
     ]);
   }
 
   const existingDeductions = await db.select().from(deductionTypes);
   if (existingDeductions.length === 0) {
     await db.insert(deductionTypes).values([
-      { code: "DED-PIK", name: "Pikulan", calculationType: "per_kg", defaultValue: "100", impactType: "SUPPLIER_DEDUCTION" },
-      { code: "DED-ANG", name: "Angkat Panggul", calculationType: "per_kg", defaultValue: "50", impactType: "SUPPLIER_DEDUCTION" },
-      { code: "DED-TRN", name: "Transport", calculationType: "fixed", defaultValue: "100000", impactType: "PURCHASE_COST" },
-      { code: "DED-KTR", name: "Potongan Kotoran", calculationType: "percentage", defaultValue: "1", impactType: "SUPPLIER_DEDUCTION" },
+      {
+        code: "DED-PIK",
+        name: "Pikulan",
+        calculationType: "per_kg",
+        defaultValue: "100",
+        impactType: "SUPPLIER_DEDUCTION",
+      },
+      {
+        code: "DED-ANG",
+        name: "Angkat Panggul",
+        calculationType: "per_kg",
+        defaultValue: "50",
+        impactType: "SUPPLIER_DEDUCTION",
+      },
+      {
+        code: "DED-TRN",
+        name: "Transport",
+        calculationType: "fixed",
+        defaultValue: "100000",
+        impactType: "PURCHASE_COST",
+      },
+      {
+        code: "DED-KTR",
+        name: "Potongan Kotoran",
+        calculationType: "percentage",
+        defaultValue: "1",
+        impactType: "SUPPLIER_DEDUCTION",
+      },
     ]);
   }
 
   const existingPurchases = await db.select().from(purchases);
   if (existingPurchases.length === 0) {
     const wh = (await db.select().from(warehouses))[0];
-    const rawMaterial = (await db.select().from(products).where(sql`type = 'RAW_MATERIAL'`))[0];
+    const rawMaterial = (
+      await db
+        .select()
+        .from(products)
+        .where(sql`type = 'RAW_MATERIAL'`)
+    )[0];
     const sup = await db.select().from(suppliers);
 
     const samples = [
