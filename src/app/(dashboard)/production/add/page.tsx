@@ -4,8 +4,9 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { createProductionBatch, getRawMaterialUnitCosts } from "@/actions/production-actions";
-import { generateDocumentNumber } from "@/actions/numbering-actions";
-import { useEffect } from "react";
+import { peekCustomDocumentNumber, generateCustomDocumentNumber } from "@/actions/numbering-actions";
+import { getDocumentSequences } from "@/actions/settings-actions";
+import { useEffect, useMemo } from "react";
 import { getProducts, getWarehouses } from "@/actions/master-actions";
 import { getStockBalances } from "@/actions/warehouse-actions";
 import { Button } from "@/components/ui/button";
@@ -80,10 +81,6 @@ export default function AddProductionPage() {
     },
   });
 
-  useEffect(() => {
-    generateDocumentNumber("PRODUCTION").then((n) => setValue("number", n));
-  }, [setValue]);
-
   const inputs = useFieldArray({ control, name: "inputs" });
   const outputs = useFieldArray({ control, name: "outputs" });
   const costs = useFieldArray({ control, name: "costs" });
@@ -92,6 +89,16 @@ export default function AddProductionPage() {
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: stockBalances } = useQuery({ queryKey: ["stock-balances-all"], queryFn: () => getStockBalances() });
   const { data: rawUnitCosts } = useQuery({ queryKey: ["raw-unit-costs"], queryFn: getRawMaterialUnitCosts });
+  const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
+
+  const productionPrefix = useMemo(() => {
+    const seq = sequences?.find((s) => s.docType === "PRODUCTION");
+    return seq?.prefix ?? "PRD";
+  }, [sequences]);
+
+  useEffect(() => {
+    peekCustomDocumentNumber("PRODUCTION", productionPrefix).then((n) => setValue("number", n));
+  }, [setValue, productionPrefix]);
 
   const watchedInputs = watch("inputs") || [];
   const watchedOutputs = watch("outputs") || [];
@@ -144,8 +151,9 @@ export default function AddProductionPage() {
     }
 
     try {
+      const finalNumber = await generateCustomDocumentNumber("PRODUCTION", productionPrefix);
       const res = await createProductionBatch({
-        number: data.number,
+        number: finalNumber,
         date: data.date,
         notes: data.notes,
         inputs: data.inputs.map((i) => ({

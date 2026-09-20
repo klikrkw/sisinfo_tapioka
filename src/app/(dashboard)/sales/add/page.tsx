@@ -2,7 +2,8 @@
 
 import { useForm, useFieldArray } from "react-hook-form";
 import { createSale } from "@/actions/sales-actions";
-import { generateDocumentNumber } from "@/actions/numbering-actions";
+import { peekCustomDocumentNumber, generateCustomDocumentNumber } from "@/actions/numbering-actions";
+import { getDocumentSequences } from "@/actions/settings-actions";
 import { getProducts, getWarehouses } from "@/actions/master-actions";
 import { getStockBalances } from "@/actions/warehouse-actions";
 import { getLatestHppByProduct } from "@/actions/production-actions";
@@ -16,7 +17,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, AlertTriangle, PackageCheck } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 
 export default function AddSalePage() {
   const router = useRouter();
@@ -33,10 +34,6 @@ export default function AddSalePage() {
     },
   });
 
-  useEffect(() => {
-    generateDocumentNumber("SALES").then((n) => setValue("number", n));
-  }, [setValue]);
-
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
   const { data: customers } = useQuery({ queryKey: ["customers"], queryFn: getCustomers });
@@ -44,6 +41,16 @@ export default function AddSalePage() {
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: stockBalances } = useQuery({ queryKey: ["stock-balances-all"], queryFn: () => getStockBalances() });
   const { data: hppMap } = useQuery({ queryKey: ["latest-hpp-by-product"], queryFn: getLatestHppByProduct });
+  const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
+
+  const salesPrefix = useMemo(() => {
+    const seq = sequences?.find((s) => s.docType === "SALES");
+    return seq?.prefix ?? "PJ";
+  }, [sequences]);
+
+  useEffect(() => {
+    peekCustomDocumentNumber("SALES", salesPrefix).then((n) => setValue("number", n));
+  }, [setValue, salesPrefix]);
 
   const hppFor = (productId: string | number) => hppMap?.[Number(productId)] ?? 0;
 
@@ -73,8 +80,9 @@ export default function AddSalePage() {
       return;
     }
     try {
+      const finalNumber = await generateCustomDocumentNumber("SALES", salesPrefix);
       const res = await createSale({
-        number: data.number,
+        number: finalNumber,
         date: data.date,
         customerId: Number(data.customerId),
         warehouseId: Number(data.warehouseId),

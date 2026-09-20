@@ -2,6 +2,8 @@
 
 import { useForm, useFieldArray } from "react-hook-form";
 import { createShipment } from "@/actions/fleet-actions";
+import { peekCustomDocumentNumber, generateCustomDocumentNumber } from "@/actions/numbering-actions";
+import { getDocumentSequences } from "@/actions/settings-actions";
 import { getVehicles, getDrivers } from "@/actions/master-others";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,14 +14,15 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo } from "react";
 
 const COST_CATEGORIES = ["Solar", "Sopir", "Tol", "Parkir", "Servis", "Ban", "Oli", "Reparasi", "Pajak", "Asuransi", "Lainnya"];
 
 export default function AddShipmentPage() {
   const router = useRouter();
-  const { register, handleSubmit, watch, control } = useForm({
+  const { register, handleSubmit, watch, control, setValue } = useForm({
     defaultValues: {
-      number: `DO/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}/000001`,
+      number: "",
       date: new Date().toISOString().slice(0, 10),
       vehicleId: "",
       driverId: "",
@@ -36,6 +39,16 @@ export default function AddShipmentPage() {
   const { fields, append, remove } = useFieldArray({ control, name: "costs" });
   const { data: vehicles } = useQuery({ queryKey: ["vehicles"], queryFn: getVehicles });
   const { data: drivers } = useQuery({ queryKey: ["drivers"], queryFn: getDrivers });
+  const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
+
+  const shipmentPrefix = useMemo(() => {
+    const seq = sequences?.find((s) => s.docType === "SHIPMENT");
+    return seq?.prefix ?? "DO";
+  }, [sequences]);
+
+  useEffect(() => {
+    peekCustomDocumentNumber("SHIPMENT", shipmentPrefix).then((n) => setValue("number", n));
+  }, [setValue, shipmentPrefix]);
 
   const kmStart = Number(watch("kmStart")) || 0;
   const kmEnd = Number(watch("kmEnd")) || 0;
@@ -44,8 +57,9 @@ export default function AddShipmentPage() {
 
   const onSubmit = async (data: any) => {
     try {
+      const finalNumber = await generateCustomDocumentNumber("SHIPMENT", shipmentPrefix);
       await createShipment({
-        number: data.number,
+        number: finalNumber,
         date: data.date,
         vehicleId: Number(data.vehicleId),
         driverId: Number(data.driverId),

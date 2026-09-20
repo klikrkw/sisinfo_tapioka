@@ -22,6 +22,7 @@ export default function NumberingPage() {
   const queryClient = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["document-sequences"], queryFn: getDocumentSequences });
   const [editing, setEditing] = useState<Record<string, string>>({});
+  const [prefixEditing, setPrefixEditing] = useState<Record<string, string>>({});
 
   const saveMut = useMutation({
     mutationFn: (payload: { docType: string; prefix: string; pattern: string }) => saveDocumentSequence(payload),
@@ -49,11 +50,17 @@ export default function NumberingPage() {
               {DEFAULTS.map((d) => {
                 const existing = data?.find((s) => s.docType === d.docType);
                 const pattern = editing[d.docType] ?? existing?.pattern ?? d.pattern;
-                const prefix = existing?.prefix ?? d.prefix;
+                const prefix = prefixEditing[d.docType] ?? existing?.prefix ?? d.prefix;
                 return (
                   <TableRow key={d.docType}>
                     <TableCell className="font-medium">{d.docType}</TableCell>
-                    <TableCell className="font-mono">{prefix}</TableCell>
+                    <TableCell>
+                      <Input
+                        value={prefix}
+                        onChange={(e) => setPrefixEditing({ ...prefixEditing, [d.docType]: e.target.value })}
+                        className="w-24 font-mono text-sm"
+                      />
+                    </TableCell>
                     <TableCell>
                       <Input
                         value={pattern}

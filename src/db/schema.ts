@@ -322,6 +322,7 @@ export const documentSequences = mysqlTable("document_sequences", {
   prefix: varchar("prefix", { length: 20 }).notNull(),
   pattern: varchar("pattern", { length: 100 }).notNull(),
   lastNumber: int("last_number").notNull().default(0),
+  period: varchar("period", { length: 6 }),
 });
 
 export const auditLogs = mysqlTable("audit_logs", {

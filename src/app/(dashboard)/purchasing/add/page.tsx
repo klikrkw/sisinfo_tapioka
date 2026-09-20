@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { createPurchaseTransaction } from "@/actions/purchasing-actions";
 import { getSuppliers, getProducts, getWarehouses } from "@/actions/master-actions";
 import { getDeductionTypes } from "@/actions/master-others";
+import { getDocumentSequences } from "@/actions/settings-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -15,12 +16,14 @@ import { Separator } from "@/components/ui/separator";
 import { calculatePurchaseWeight, calculatePurchaseAmount } from "@/lib/calculations/purchasing";
 import { useMemo } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { peekCustomDocumentNumber, generateCustomDocumentNumber } from "@/actions/numbering-actions";
+import { useEffect } from "react";
 
 export default function AddPurchasePage() {
   const router = useRouter();
   const { register, handleSubmit, watch, control, setValue } = useForm({
     defaultValues: {
-      number: `PB/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, "0")}/000001`,
+      number: "",
       date: new Date().toISOString().slice(0, 10),
       supplierId: "",
       rawMaterialId: "",
@@ -43,6 +46,16 @@ export default function AddPurchasePage() {
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: dedTypes } = useQuery({ queryKey: ["deductionTypes"], queryFn: getDeductionTypes });
+  const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
+
+  const purchasePrefix = useMemo(() => {
+    const seq = sequences?.find((s) => s.docType === "PURCHASE");
+    return seq?.prefix ?? "PB";
+  }, [sequences]);
+
+  useEffect(() => {
+    peekCustomDocumentNumber("PURCHASE", purchasePrefix).then((n) => setValue("number", n));
+  }, [setValue, purchasePrefix]);
 
   const grossWeight = Number(watch("grossWeight")) || 0;
   const tareWeight = Number(watch("tareWeight")) || 0;
@@ -59,9 +72,10 @@ export default function AddPurchasePage() {
 
   const onSubmit = async (data: any) => {
     try {
+      const finalNumber = await generateCustomDocumentNumber("PURCHASE", purchasePrefix);
       await createPurchaseTransaction({
-        number: data.number,
-        date: data.date,
+        ...data,
+        number: finalNumber,
         supplierId: Number(data.supplierId),
         rawMaterialId: Number(data.rawMaterialId),
         warehouseId: Number(data.warehouseId),
@@ -69,7 +83,6 @@ export default function AddPurchasePage() {
         tareWeight: Number(data.tareWeight),
         refactionPercent: Number(data.refactionPercent),
         pricePerKg: Number(data.pricePerKg),
-        notes: data.notes,
         deductions: data.deductions.map((d: any) => ({
           deductionTypeId: Number(d.deductionTypeId),
           name: d.name,
