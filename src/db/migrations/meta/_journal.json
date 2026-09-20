@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1789736031578,
+      "tag": "0000_mature_winter_soldier",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1789739080061,
+      "tag": "0001_eminent_eddie_brock",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1789739453528,
+      "tag": "0002_youthful_annihilus",
+      "breakpoints": true
+    }
+  ]
+}

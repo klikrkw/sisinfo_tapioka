@@ -1,0 +1,124 @@
+# Panduan Push ke GitHub dari Server Ubuntu
+
+## Masalah Umum
+
+1. `git: 'credential-wincred' is not a git command`
+   - Terjadi karena global git config masih memakai credential helper Windows.
+   - Solusi: hapus helper tersebut:
+     ```bash
+     git config --global --unset credential.helper
+     ```
+
+2. `remote: Invalid username or token. Password authentication is not supported for Git operations.`
+   - GitHub sudah tidak menerima password akun untuk operasi Git (HTTPS).
+   - Wajib pakai Personal Access Token (PAT) atau SSH key.
+
+---
+
+## Opsi A — GitHub CLI (paling mudah)
+
+```bash
+sudo apt install gh
+gh auth login
+gh auth setup-git
+```
+
+Saat `gh auth login` pilih:
+- GitHub.com
+- HTTPS
+- Login via browser / token
+
+Setelah itu push seperti biasa:
+
+```bash
+cd /var/www/html/web/projects/sisinfo_tapioka
+git push
+```
+
+---
+
+## Opsi B — Personal Access Token (PAT) manual
+
+1. Buat token di: https://github.com/settings/tokens
+   - Klik "Generate new token (classic)"
+   - Centang scope `repo`
+   - Copy token yang muncul (hanya tampil sekali)
+
+2. Simpan kredensial:
+
+```bash
+git config --global credential.helper store
+cd /var/www/html/web/projects/sisinfo_tapioka
+git push
+```
+
+3. Saat diminta kredensial:
+   - Username: `arsagk` (atau `klikrkw`)
+   - Password: tempel token (BUKAN password akun)
+
+Catatan:
+- Token tersimpan plaintext di `~/.git-credentials`. Jangan bagikan file ini.
+- Jangan pernah menaruh token di dalam URL repo.
+
+---
+
+## Opsi C — SSH Key (paling aman, tanpa token)
+
+1. Buat SSH key:
+
+```bash
+ssh-keygen -t ed25519 -C "arsagibrankhalfani@gmail.com"
+cat ~/.ssh/id_ed25519.pub
+```
+
+2. Copy isi pubkey ke: https://github.com/settings/keys
+   - Klik "New SSH key"
+   - Tempel pubkey, simpan
+
+3. Ubah URL remote menjadi SSH:
+
+```bash
+cd /var/www/html/web/projects/sisinfo_tapioka
+git remote set-url origin git@github.com:klikrkw/sisinfo_tapioka.git
+git push
+```
+
+4. Tes koneksi SSH (opsional):
+
+```bash
+ssh -T git@github.com
+```
+
+---
+
+## Verifikasi Akses
+
+- Pastikan akun yang dipakai (`arsagk` / `klikrkw`) punya akses tulis ke repo `klikrkw/sisinfo_tapioka`.
+- Cek remote saat ini:
+
+```bash
+git remote -v
+```
+
+- Cek status credential:
+
+```bash
+git config --global --list | grep credential
+```
+
+---
+
+## Alur Push Standar
+
+```bash
+cd /var/www/html/web/projects/sisinfo_tapioka
+git add .
+git commit -m "pesan commit"
+git push
+```
+
+Jika branch belum punya upstream:
+
+```bash
+git push --set-upstream origin master
+```

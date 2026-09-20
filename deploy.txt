@@ -1,0 +1,119 @@
+# Panduan Deploy Aplikasi Sisinfo Tapioka di Server Ubuntu
+
+Aplikasi berjalan di port 3005 menggunakan PM2 sebagai process manager,
+dan otomatis berjalan kembali setelah sistem reboot.
+
+## Ringkasan Perintah Cepat
+
+```bash
+cd /var/www/html/web/projects/sisinfo_tapioka
+npm install
+npm run build
+pm2 start npm --name "sisinfo_tapioka" -- run start
+pm2 save
+sudo env PATH=$PATH:/home/masbah/.nvm/versions/node/v24.19.0/bin /home/masbah/.nvm/versions/node/v24.19.0/lib/node_modules/pm2/bin/pm2 startup systemd -u masbah --hp /home/masbah
+pm2 list
+```
+
+---
+
+## Langkah Detail
+
+### 1. Masuk ke direktori proyek
+
+```bash
+cd /var/www/html/web/projects/sisinfo_tapioka
+```
+
+### 2. Install dependency & build
+
+```bash
+npm install
+npm run build
+```
+
+### 3. Install PM2 global (jika belum ada)
+
+```bash
+npm install -g pm2
+```
+
+### 4. Jalankan aplikasi via PM2
+
+```bash
+pm2 start npm --name "sisinfo_tapioka" -- run start
+pm2 save
+```
+
+App akan tersedia di: http://localhost:3005
+
+### 5. Daftarkan PM2 ke systemd (agar jalan otomatis saat boot)
+
+```bash
+sudo pm2 startup systemd -u $USER --hp $HOME
+```
+
+Jalankan perintah `sudo env PATH=...` yang dikeluarkan oleh command di atas.
+Contoh pada server ini:
+
+```bash
+sudo env PATH=$PATH:/home/masbah/.nvm/versions/node/v24.19.0/bin /home/masbah/.nvm/versions/node/v24.19.0/lib/node_modules/pm2/bin/pm2 startup systemd -u masbah --hp /home/masbah
+```
+
+### 6. Simpan daftar proses PM2
+
+```bash
+pm2 save
+```
+
+### 7. Verifikasi
+
+```bash
+pm2 list
+curl -I http://localhost:3005
+```
+
+Lalu reboot untuk memastikan aplikasi kembali jalan otomatis:
+
+```bash
+sudo reboot
+```
+
+Setelah reboot, `pm2 list` harus menampilkan proses `sisinfo_tapioka` dengan status `online`.
+
+---
+
+## Perintah Operasional Harian
+
+| Perintah | Fungsi |
+|---|---|
+| `pm2 list` | Lihat status semua proses |
+| `pm2 logs sisinfo_tapioka` | Lihat log aplikasi |
+| `pm2 restart sisinfo_tapioka` | Restart aplikasi |
+| `pm2 stop sisinfo_tapioka` | Hentikan aplikasi |
+| `pm2 delete sisinfo_tapioka` | Hapus proses dari PM2 |
+| `pm2 monit` | Monitoring CPU & memory |
+
+---
+
+## Update / Deploy Ulang Setelah Ada Perubahan Kode
+
+```bash
+cd /var/www/html/web/projects/sisinfo_tapioka
+git pull
+npm install
+npm run build
+pm2 restart sisinfo_tapioka
+pm2 save
+```
+
+---
+
+## Catatan Penting
+
+- Port aplikasi diset di `package.json` pada script `start`: `next start -p 3005`.
+- `NEXTAUTH_URL` di file `.env` harus sesuai port: `http://localhost:3005`.
+- Auth.js memerlukan `trustHost: true` pada `src/lib/auth/config.ts` (sudah diset)
+  agar tidak error `UntrustedHost` saat dijalankan di server.
+- Pastikan MySQL berjalan dan `DATABASE_URL` di `.env` sudah benar.
+- Backup database dapat dilakukan melalui menu: Pengaturan > Backup & Restore.
