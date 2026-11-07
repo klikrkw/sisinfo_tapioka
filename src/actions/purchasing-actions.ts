@@ -104,6 +104,11 @@ export async function updatePurchaseTransaction(
     warehouseId: number;
     grossWeight: number;
     tareWeight: number;
+    policeNumber?: string;
+    poNumber?: string;
+    entryTime?: string;
+    exitDate?: string;
+    exitTime?: string;
     refactionPercent: number;
     pricePerKg: number;
     notes?: string;
@@ -133,6 +138,11 @@ export async function updatePurchaseTransaction(
       warehouseId: formData.warehouseId,
       grossWeight: String(formData.grossWeight),
       tareWeight: String(formData.tareWeight),
+      policeNumber: formData.policeNumber || null,
+      poNumber: formData.poNumber || null,
+      entryTime: formData.entryTime || null,
+      exitDate: formData.exitDate ? new Date(formData.exitDate) : null,
+      exitTime: formData.exitTime || null,
       netWeight: String(netWeight),
       refactionPercent: String(formData.refactionPercent),
       refactionWeight: String(refactionWeight),
@@ -171,6 +181,11 @@ export async function createPurchaseTransaction(formData: {
   warehouseId: number;
   grossWeight: number;
   tareWeight: number;
+  policeNumber?: string;
+  poNumber?: string;
+  entryTime?: string;
+  exitDate?: string;
+  exitTime?: string;
   refactionPercent: number;
   pricePerKg: number;
   notes?: string;
@@ -194,6 +209,11 @@ export async function createPurchaseTransaction(formData: {
       warehouseId: formData.warehouseId,
       grossWeight: String(formData.grossWeight),
       tareWeight: String(formData.tareWeight),
+      policeNumber: formData.policeNumber || null,
+      poNumber: formData.poNumber || null,
+      entryTime: formData.entryTime || null,
+      exitDate: formData.exitDate ? new Date(formData.exitDate) : null,
+      exitTime: formData.exitTime || null,
       netWeight: String(netWeight),
       refactionPercent: String(formData.refactionPercent),
       refactionWeight: String(refactionWeight),

@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { calculateHpp } from "@/lib/calculations/production";
 import { Plus, Trash2, AlertTriangle, PackageCheck } from "lucide-react";
 
@@ -213,9 +214,14 @@ export default function AddProductionPage() {
           <Separator />
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Input (Ketela dari Gudang)</p>
-            <Button type="button" variant="outline" size="sm" onClick={() => inputs.append({ productId: "", warehouseId: "", quantity: 0 })}>
-              <Plus className="mr-2 h-4 w-4" /> Tambah Input
-            </Button>
+            <Tooltip>
+              <TooltipTrigger render={<span className="inline-flex" />}>
+                <Button type="button" variant="outline" size="sm" onClick={() => inputs.append({ productId: "", warehouseId: "", quantity: 0 })}>
+                  <Plus className="mr-2 h-4 w-4" /> Tambah Input
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Tambah baris bahan baku yang dipakai untuk produksi.</TooltipContent>
+            </Tooltip>
           </div>
           {inputErrors?.message && <p className="text-xs text-destructive">{inputErrors.message}</p>}
           <div className="space-y-3">
@@ -228,26 +234,55 @@ export default function AddProductionPage() {
               return (
                 <div key={f.id} className={`space-y-2 rounded-lg border p-3 ${exceeds ? "border-destructive bg-destructive/5" : "bg-muted/20"}`}>
                   <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      className="flex h-10 min-w-[150px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      {...register(`inputs.${i}.productId`, { onChange: () => clearErrors(`inputs.${i}.quantity`) })}
-                    >
-                      <option value="">Pilih Bahan</option>
-                      {products?.filter((p) => p.type === "RAW_MATERIAL").map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                    <select
-                      className="flex h-10 min-w-[130px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      {...register(`inputs.${i}.warehouseId`, { onChange: () => clearErrors(`inputs.${i}.quantity`) })}
-                    >
-                      <option value="">Gudang</option>
-                      {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                    </select>
-                    <Input type="number" step="0.01" placeholder="Qty (Kg)" className={`w-32 ${exceeds ? "border-destructive" : ""}`} {...register(`inputs.${i}.quantity`, { valueAsNumber: true })} />
-                    <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => inputs.remove(i)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger render={<div className="min-w-[150px] flex-1" />}>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          {...register(`inputs.${i}.productId`, { onChange: () => clearErrors(`inputs.${i}.quantity`) })}
+                        >
+                          <option value="">Pilih Bahan</option>
+                          {products?.filter((p) => p.type === "RAW_MATERIAL").map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </TooltipTrigger>
+                      <TooltipContent>Pilih bahan baku (ketela) yang akan diproses.</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger render={<div className="min-w-[130px] flex-1" />}>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          {...register(`inputs.${i}.warehouseId`, { onChange: () => clearErrors(`inputs.${i}.quantity`) })}
+                        >
+                          <option value="">Gudang</option>
+                          {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                        </select>
+                      </TooltipTrigger>
+                      <TooltipContent>Gudang asal bahan baku. Stok tersedia mengikuti gudang ini.</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger render={<div className="w-32" />}>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Qty (Kg)"
+                          className={`w-full ${exceeds ? "border-destructive" : ""}`}
+                          {...register(`inputs.${i}.quantity`, { valueAsNumber: true })}
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent>Jumlah bahan yang dipakai dalam Kg. Tidak boleh melebihi stok tersedia.</TooltipContent>
+                    </Tooltip>
+
+                    <Tooltip>
+                      <TooltipTrigger render={<span className="inline-flex" />}>
+                        <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => inputs.remove(i)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Hapus baris input ini.</TooltipContent>
+                    </Tooltip>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 pl-1 text-xs">
                     {stock ? (
@@ -279,42 +314,82 @@ export default function AddProductionPage() {
 
           <Separator />
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Output (Tepung & Ampas)</p>
+            <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Output (Tepung, Ampas & Pongkol)</p>
             <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const flour = products?.find((p) => p.type === "FINISHED_GOOD");
-                  outputs.append({
-                    productId: flour ? String(flour.id) : "",
-                    warehouseId: warehouses?.[0] ? String(warehouses[0].id) : "",
-                    quantity: 0,
-                    isByProduct: false,
-                    pricePerUnit: Number(flour?.defaultPrice ?? 0),
-                  });
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Tepung
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  const byProduct = products?.find((p) => p.type === "BY_PRODUCT");
-                  outputs.append({
-                    productId: byProduct ? String(byProduct.id) : "",
-                    warehouseId: warehouses?.[0] ? String(warehouses[0].id) : "",
-                    quantity: 0,
-                    isByProduct: true,
-                    pricePerUnit: Number(byProduct?.defaultPrice ?? 500),
-                  });
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" /> Ampas
-              </Button>
+              <Tooltip>
+                <TooltipTrigger render={<span className="inline-flex" />}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const flour =
+                        products?.find((p) => p.type === "FINISHED_GOOD" && /tep/i.test(p.name)) ??
+                        products?.find((p) => p.type === "FINISHED_GOOD");
+                      outputs.append({
+                        productId: flour ? String(flour.id) : "",
+                        warehouseId: warehouses?.[0] ? String(warehouses[0].id) : "",
+                        quantity: 0,
+                        isByProduct: false,
+                        pricePerUnit: Number(flour?.defaultPrice ?? 0),
+                      });
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Tepung
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Tambah baris output Tepung sebagai produk utama.</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger render={<span className="inline-flex" />}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const byProduct =
+                        products?.find((p) => p.type === "BY_PRODUCT" && /ampas/i.test(p.name)) ??
+                        products?.find((p) => p.type === "BY_PRODUCT");
+                      outputs.append({
+                        productId: byProduct ? String(byProduct.id) : "",
+                        warehouseId: warehouses?.[0] ? String(warehouses[0].id) : "",
+                        quantity: 0,
+                        isByProduct: true,
+                        pricePerUnit: Number(byProduct?.defaultPrice ?? 500),
+                      });
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Ampas
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Tambah baris output Ampas sebagai produk sampingan.</TooltipContent>
+              </Tooltip>
+
+              <Tooltip>
+                <TooltipTrigger render={<span className="inline-flex" />}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const pongkol =
+                        products?.find((p) => p.type === "BY_PRODUCT" && /pongkol/i.test(p.name)) ??
+                        products?.find((p) => p.type === "BY_PRODUCT" && !/ampas/i.test(p.name));
+                      outputs.append({
+                        productId: pongkol ? String(pongkol.id) : "",
+                        warehouseId: warehouses?.[0] ? String(warehouses[0].id) : "",
+                        quantity: 0,
+                        isByProduct: true,
+                        pricePerUnit: Number(pongkol?.defaultPrice ?? 500),
+                      });
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" /> Pongkol
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Tambah baris output Pongkol sebagai produk sampingan.</TooltipContent>
+              </Tooltip>
             </div>
           </div>
           {errors.outputs?.message && <p className="text-xs text-destructive">{errors.outputs.message}</p>}
@@ -328,41 +403,83 @@ export default function AddProductionPage() {
               return (
               <div key={f.id} className="space-y-2 rounded-lg border bg-muted/20 p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                <select
-                  className="flex h-10 min-w-[150px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  {...register(`outputs.${i}.productId`, {
-                    onChange: (e) => {
-                      const prod = products?.find((p) => String(p.id) === e.target.value);
-                      if (prod) {
-                        setValue(`outputs.${i}.isByProduct`, prod.type === "BY_PRODUCT");
-                        if (prod.type === "BY_PRODUCT" && !Number(watchedOutputs[i]?.pricePerUnit)) {
-                          setValue(`outputs.${i}.pricePerUnit`, Number(prod.defaultPrice));
-                        }
-                      }
-                    },
-                  })}
-                >
-                  <option value="">Pilih Produk</option>
-                  {products?.filter((p) => p.type === "FINISHED_GOOD" || p.type === "BY_PRODUCT").map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} {p.type === "BY_PRODUCT" ? "(Sampingan)" : ""}</option>
-                  ))}
-                </select>
-                <select
-                  className="flex h-10 min-w-[130px] flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  {...register(`outputs.${i}.warehouseId`)}
-                >
-                  <option value="">Gudang</option>
-                  {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-                </select>
-                <Input type="number" step="0.01" placeholder="Qty (Kg)" className="w-28" {...register(`outputs.${i}.quantity`, { valueAsNumber: true })} />
-                <Input type="number" step="0.01" placeholder="Harga/Kg" className="w-28" {...register(`outputs.${i}.pricePerUnit`, { valueAsNumber: true })} />
+                <Tooltip>
+                  <TooltipTrigger render={<div className="min-w-[150px] flex-1" />}>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      {...register(`outputs.${i}.productId`, {
+                        onChange: (e) => {
+                          const prod = products?.find((p) => String(p.id) === e.target.value);
+                          if (prod) {
+                            setValue(`outputs.${i}.isByProduct`, prod.type === "BY_PRODUCT");
+                            if (prod.type === "BY_PRODUCT" && !Number(watchedOutputs[i]?.pricePerUnit)) {
+                              setValue(`outputs.${i}.pricePerUnit`, Number(prod.defaultPrice));
+                            }
+                          }
+                        },
+                      })}
+                    >
+                      <option value="">Pilih Produk</option>
+                      {products?.filter((p) => p.type === "FINISHED_GOOD" || p.type === "BY_PRODUCT").map((p) => (
+                        <option key={p.id} value={p.id}>{p.name} {p.type === "BY_PRODUCT" ? "(Sampingan)" : ""}</option>
+                      ))}
+                    </select>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Pilih produk hasil. Tepung = produk utama; Ampas/Pongkol = produk sampingan.
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger render={<div className="min-w-[130px] flex-1" />}>
+                    <select
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      {...register(`outputs.${i}.warehouseId`)}
+                    >
+                      <option value="">Gudang</option>
+                      {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                    </select>
+                  </TooltipTrigger>
+                  <TooltipContent>Gudang tujuan penyimpanan hasil produksi.</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger render={<div className="w-28" />}>
+                    <Input type="number" step="0.01" placeholder="Qty (Kg)" className="w-full" {...register(`outputs.${i}.quantity`, { valueAsNumber: true })} />
+                  </TooltipTrigger>
+                  <TooltipContent>Jumlah output dalam satuan Kg.</TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger render={<div className="w-28" />}>
+                    <Input type="number" step="0.01" placeholder="Harga/Kg" className="w-full" {...register(`outputs.${i}.pricePerUnit`, { valueAsNumber: true })} />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Harga per Kg. Untuk produk sampingan, nilai ini mengurangi biaya produksi tepung.
+                  </TooltipContent>
+                </Tooltip>
+
                 <input type="hidden" {...register(`outputs.${i}.isByProduct`)} />
-                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${isByProduct ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"}`}>
-                  {isByProduct ? "Sampingan" : "Produk Utama"}
-                </span>
-                <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => outputs.remove(i)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${isByProduct ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400" : "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400"}`}>
+                      {isByProduct ? "Sampingan" : "Produk Utama"}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Produk utama menambah HPP tepung; produk sampingan mengurangi biaya produksi.
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger render={<span className="inline-flex" />}>
+                    <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => outputs.remove(i)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Hapus baris output ini.</TooltipContent>
+                </Tooltip>
                 </div>
                 {isByProduct && outQty > 0 && (
                   <p className="pl-1 text-xs text-amber-700 dark:text-amber-400">
@@ -416,7 +533,7 @@ export default function AddProductionPage() {
                 <p className="font-mono font-bold">Rp {totalCost.toLocaleString("id-ID")}</p>
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Nilai Ampas</p>
+                <p className="text-xs text-muted-foreground">Nilai Sampingan</p>
                 <p className="font-mono font-bold">Rp {byProductValue.toLocaleString("id-ID")}</p>
               </div>
               <div>

@@ -14,8 +14,13 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import { calculatePurchaseWeight, calculatePurchaseAmount } from "@/lib/calculations/purchasing";
-import { use, useEffect, useMemo } from "react";
-import { Plus, Trash2, Lock } from "lucide-react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
+import { Plus, Trash2, Lock, FileText } from "lucide-react";
+import { getCompanySettings } from "@/actions/settings-actions";
+import {
+  PurchaseReceiptDialog,
+  type PurchaseReceiptData,
+} from "@/components/purchasing/purchase-receipt-dialog";
 
 export default function EditPurchasePage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -36,6 +41,11 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
       warehouseId: "",
       grossWeight: 0,
       tareWeight: 0,
+      policeNumber: "",
+      poNumber: "",
+      entryTime: "",
+      exitDate: "",
+      exitTime: "",
       refactionPercent: 0,
       pricePerKg: 0,
       notes: "",
@@ -49,31 +59,44 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: dedTypes } = useQuery({ queryKey: ["deductionTypes"], queryFn: getDeductionTypes });
+  const { data: company } = useQuery({ queryKey: ["companySettings"], queryFn: getCompanySettings });
+
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const initializedRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (purchase) {
-      reset({
-        number: purchase.number,
-        date: purchase.date ? new Date(purchase.date).toISOString().slice(0, 10) : "",
-        supplierId: String(purchase.supplierId),
-        rawMaterialId: String(purchase.rawMaterialId),
-        warehouseId: String(purchase.warehouseId),
-        grossWeight: Number(purchase.grossWeight),
-        tareWeight: Number(purchase.tareWeight),
-        refactionPercent: Number(purchase.refactionPercent),
-        pricePerKg: Number(purchase.pricePerKg),
-        notes: purchase.notes ?? "",
-        deductions: (purchase.deductions ?? []).map((d) => ({
-          deductionTypeId: d.deductionTypeId,
-          name: d.name,
-          calculationType: d.calculationType,
-          quantity: Number(d.quantity),
-          rate: Number(d.rate),
-          amount: Number(d.amount),
-        })),
-      });
-    }
-  }, [purchase, reset]);
+    if (!purchase) return;
+    // Tunggu master data selesai dimuat, agar nilai select tidak jatuh ke placeholder.
+    if (!suppliers || !products || !warehouses) return;
+    if (initializedRef.current === purchase.id) return;
+
+    reset({
+      number: purchase.number,
+      date: purchase.date ? new Date(purchase.date).toISOString().slice(0, 10) : "",
+      supplierId: String(purchase.supplierId),
+      rawMaterialId: String(purchase.rawMaterialId),
+      warehouseId: String(purchase.warehouseId),
+      grossWeight: Number(purchase.grossWeight),
+      tareWeight: Number(purchase.tareWeight),
+      policeNumber: purchase.policeNumber ?? "",
+      poNumber: purchase.poNumber ?? "",
+      entryTime: purchase.entryTime ?? "",
+      exitDate: purchase.exitDate ? new Date(purchase.exitDate).toISOString().slice(0, 10) : "",
+      exitTime: purchase.exitTime ?? "",
+      refactionPercent: Number(purchase.refactionPercent),
+      pricePerKg: Number(purchase.pricePerKg),
+      notes: purchase.notes ?? "",
+      deductions: (purchase.deductions ?? []).map((d) => ({
+        deductionTypeId: d.deductionTypeId,
+        name: d.name,
+        calculationType: d.calculationType,
+        quantity: Number(d.quantity),
+        rate: Number(d.rate),
+        amount: Number(d.amount),
+      })),
+    });
+    initializedRef.current = purchase.id;
+  }, [purchase, suppliers, products, warehouses, reset]);
 
   const grossWeight = Number(watch("grossWeight")) || 0;
   const tareWeight = Number(watch("tareWeight")) || 0;
@@ -90,6 +113,66 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
 
   const isPosted = purchase && purchase.status !== "Draft";
 
+  const watchedNumber = watch("number");
+  const watchedDate = watch("date");
+  const watchedSupplierId = watch("supplierId");
+  const watchedRawMaterialId = watch("rawMaterialId");
+  const watchedPoliceNumber = watch("policeNumber");
+  const watchedPoNumber = watch("poNumber");
+  const watchedEntryTime = watch("entryTime");
+  const watchedExitDate = watch("exitDate");
+  const watchedExitTime = watch("exitTime");
+
+  const supplierName = useMemo(
+    () => suppliers?.find((s) => String(s.id) === String(watchedSupplierId))?.name ?? "-",
+    [suppliers, watchedSupplierId]
+  );
+  const materialName = useMemo(
+    () => products?.find((p) => String(p.id) === String(watchedRawMaterialId))?.name ?? "-",
+    [products, watchedRawMaterialId]
+  );
+
+  const receiptData = useMemo<PurchaseReceiptData | null>(() => {
+    if (!purchase) return null;
+    return {
+      number: watchedNumber || purchase.number,
+      date: watchedDate || (purchase.date ? String(purchase.date) : ""),
+      supplierName,
+      materialName,
+      grossWeight,
+      tareWeight,
+      netWeight: calc.netWeight,
+      refactionWeight: calc.refactionWeight,
+      payableWeight: calc.payableWeight,
+      pricePerKg,
+      baseAmount: calc.baseAmount,
+      policeNumber: watchedPoliceNumber || undefined,
+      poNumber: watchedPoNumber || undefined,
+      entryTime: watchedEntryTime || undefined,
+      exitDate: watchedExitDate || undefined,
+      exitTime: watchedExitTime || undefined,
+      companyName: company?.name ?? undefined,
+      companyAddress: company?.address ?? undefined,
+      companyPhone: company?.phone ?? undefined,
+    };
+  }, [
+    purchase,
+    watchedNumber,
+    watchedDate,
+    supplierName,
+    materialName,
+    grossWeight,
+    tareWeight,
+    calc,
+    pricePerKg,
+    watchedPoliceNumber,
+    watchedPoNumber,
+    watchedEntryTime,
+    watchedExitDate,
+    watchedExitTime,
+    company,
+  ]);
+
   const onSubmit = async (data: any) => {
     if (isPosted) {
       toast.error("Transaksi yang telah diposting tidak dapat diedit langsung.");
@@ -104,6 +187,11 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
         warehouseId: Number(data.warehouseId),
         grossWeight: Number(data.grossWeight),
         tareWeight: Number(data.tareWeight),
+        policeNumber: data.policeNumber || undefined,
+        poNumber: data.poNumber || undefined,
+        entryTime: data.entryTime || undefined,
+        exitDate: data.exitDate || undefined,
+        exitTime: data.exitTime || undefined,
         refactionPercent: Number(data.refactionPercent),
         pricePerKg: Number(data.pricePerKg),
         notes: data.notes,
@@ -133,7 +221,12 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
     <Card className="mx-auto max-w-4xl shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Detail / Edit Pembelian</CardTitle>
-        <Badge variant={isPosted ? "secondary" : "outline"}>{purchase.status}</Badge>
+        <div className="flex items-center gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={() => setReceiptOpen(true)}>
+            <FileText className="h-4 w-4" /> Nota
+          </Button>
+          <Badge variant={isPosted ? "secondary" : "outline"}>{purchase.status}</Badge>
+        </div>
       </CardHeader>
       <CardContent>
         {isPosted && (
@@ -175,6 +268,29 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
                   <option value="">Pilih Gudang</option>
                   {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
                 </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div>
+                <Label>No. Polisi</Label>
+                <Input {...register("policeNumber")} placeholder="Contoh: K 8146 JC" />
+              </div>
+              <div>
+                <Label>No. PO / DO</Label>
+                <Input {...register("poNumber")} placeholder="Opsional" />
+              </div>
+              <div>
+                <Label>Jam Masuk</Label>
+                <Input type="time" {...register("entryTime")} />
+              </div>
+              <div>
+                <Label>Tanggal Keluar</Label>
+                <Input type="date" {...register("exitDate")} />
+              </div>
+              <div>
+                <Label>Jam Keluar</Label>
+                <Input type="time" {...register("exitTime")} />
               </div>
             </div>
 
@@ -332,6 +448,12 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
           </div>
         </form>
       </CardContent>
+
+      <PurchaseReceiptDialog
+        open={receiptOpen}
+        onOpenChange={setReceiptOpen}
+        data={receiptData}
+      />
     </Card>
   );
 }

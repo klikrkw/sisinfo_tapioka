@@ -30,6 +30,11 @@ export default function AddPurchasePage() {
       warehouseId: "",
       grossWeight: 0,
       tareWeight: 0,
+      policeNumber: "",
+      poNumber: "",
+      entryTime: "",
+      exitDate: "",
+      exitTime: "",
       refactionPercent: 0,
       pricePerKg: 0,
       notes: "",
@@ -81,6 +86,11 @@ export default function AddPurchasePage() {
         warehouseId: Number(data.warehouseId),
         grossWeight: Number(data.grossWeight),
         tareWeight: Number(data.tareWeight),
+        policeNumber: data.policeNumber || undefined,
+        poNumber: data.poNumber || undefined,
+        entryTime: data.entryTime || undefined,
+        exitDate: data.exitDate || undefined,
+        exitTime: data.exitTime || undefined,
         refactionPercent: Number(data.refactionPercent),
         pricePerKg: Number(data.pricePerKg),
         deductions: data.deductions.map((d: any) => ({
@@ -140,6 +150,29 @@ export default function AddPurchasePage() {
                 <option value="">Pilih Gudang</option>
                 {warehouses?.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <Label>No. Polisi</Label>
+              <Input {...register("policeNumber")} placeholder="Contoh: K 8146 JC" />
+            </div>
+            <div>
+              <Label>No. PO / DO</Label>
+              <Input {...register("poNumber")} placeholder="Opsional" />
+            </div>
+            <div>
+              <Label>Jam Masuk</Label>
+              <Input type="time" {...register("entryTime")} />
+            </div>
+            <div>
+              <Label>Tanggal Keluar</Label>
+              <Input type="date" {...register("exitDate")} />
+            </div>
+            <div>
+              <Label>Jam Keluar</Label>
+              <Input type="time" {...register("exitTime")} />
             </div>
           </div>
 
