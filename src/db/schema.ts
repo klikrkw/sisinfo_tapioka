@@ -44,6 +44,7 @@ export const products = mysqlTable("products", {
   id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   name: varchar("name", { length: 255 }).notNull(),
+  brand: varchar("brand", { length: 100 }),
   type: mysqlEnum("type", ["RAW_MATERIAL", "FINISHED_GOOD", "BY_PRODUCT", "PACKAGING"]).notNull(),
   unit: varchar("unit", { length: 20 }).notNull().default("Kg"),
   defaultPrice: decimal("default_price", { precision: 15, scale: 2 }).default("0"),
@@ -116,6 +117,7 @@ export const purchases = mysqlTable("purchases", {
   date: date("date").notNull(),
   supplierId: int("supplier_id").notNull(),
   rawMaterialId: int("raw_material_id").notNull(),
+  brand: varchar("brand", { length: 100 }),
   warehouseId: int("warehouse_id").notNull(),
   grossWeight: decimal("gross_weight", { precision: 15, scale: 2 }).notNull(),
   tareWeight: decimal("tare_weight", { precision: 15, scale: 2 }).notNull(),
@@ -148,6 +150,41 @@ export const stockMovements = mysqlTable("stock_movements", {
   qtyIn: decimal("qty_in", { precision: 15, scale: 2 }).default("0"),
   qtyOut: decimal("qty_out", { precision: 15, scale: 2 }).default("0"),
   balance: decimal("balance", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/**
+ * Layer stok untuk penilaian FIFO.
+ * Satu baris = satu pemasukan stok (pembelian, output produksi, penyesuaian)
+ * beserta harga pokok per unit saat masuk.
+ */
+export const stockLayers = mysqlTable("stock_layers", {
+  id: serial("id").primaryKey(),
+  warehouseId: int("warehouse_id").notNull(),
+  productId: int("product_id").notNull(),
+  sourceType: varchar("source_type", { length: 30 }).notNull(),
+  sourceId: int("source_id"),
+  sourceNumber: varchar("source_number", { length: 50 }),
+  date: date("date").notNull(),
+  qtyIn: decimal("qty_in", { precision: 15, scale: 2 }).notNull(),
+  qtyRemaining: decimal("qty_remaining", { precision: 15, scale: 2 }).notNull(),
+  unitCost: decimal("unit_cost", { precision: 15, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+/** Pemakaian layer stok (FIFO): penjualan, pemakaian produksi, penyesuaian keluar. */
+export const stockLayerUsages = mysqlTable("stock_layer_usages", {
+  id: serial("id").primaryKey(),
+  layerId: int("layer_id").notNull(),
+  warehouseId: int("warehouse_id").notNull(),
+  productId: int("product_id").notNull(),
+  date: date("date").notNull(),
+  qty: decimal("qty", { precision: 15, scale: 2 }).notNull(),
+  unitCost: decimal("unit_cost", { precision: 15, scale: 2 }).notNull(),
+  amount: decimal("amount", { precision: 15, scale: 2 }).notNull(),
+  refType: varchar("ref_type", { length: 30 }).notNull(),
+  refId: int("ref_id"),
+  saleItemId: int("sale_item_id"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -229,6 +266,12 @@ export const saleItems = mysqlTable("sale_items", {
   price: decimal("price", { precision: 15, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 15, scale: 2 }).default("0"),
   subtotal: decimal("subtotal", { precision: 15, scale: 2 }).notNull(),
+  /** HPP per unit yang dibekukan saat transaksi dibuat. */
+  hppPerUnit: decimal("hpp_per_unit", { precision: 15, scale: 2 }),
+  /** Total HPP item (qty x hpp per unit) saat transaksi dibuat. */
+  hppAmount: decimal("hpp_amount", { precision: 15, scale: 2 }),
+  /** Sumber HPP saat transaksi: PRODUCTION | PURCHASE | DEFAULT. */
+  costSource: varchar("cost_source", { length: 20 }),
 });
 
 // Fleet

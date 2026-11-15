@@ -3,6 +3,7 @@
 import { db } from "@/db";
 import { sales, purchases, productionCosts, productionOutputs, expenses, shipmentCosts, fuelTransactions, saleItems } from "@/db/schema";
 import { sql, eq } from "drizzle-orm";
+import { getPurchasedFinishedCogs } from "./costing-actions";
 
 export async function getProfitLoss(productId?: number) {
   const salesWhere = productId
@@ -66,7 +67,8 @@ export async function getProfitLoss(productId?: number) {
 
   const netProdCost = totalProdCost - byProductValue;
   const hppPerKg = flourQty > 0 ? netProdCost / flourQty : 0;
-  const grossProfit = totalSales - netProdCost;
+  const { cogs: purchasedCogs, details: purchasedCogsDetails } = await getPurchasedFinishedCogs(productId);
+  const grossProfit = totalSales - netProdCost - purchasedCogs;
   const totalDistribution = totalShipmentCost + totalFuel;
   const totalOperating = totalExpenses + totalDistribution;
   const netProfit = grossProfit - totalOperating;
@@ -81,6 +83,8 @@ export async function getProfitLoss(productId?: number) {
     flourQty,
     netProdCost,
     hppPerKg,
+    purchasedCogs,
+    purchasedCogsDetails,
     grossProfit,
     totalDistribution,
     totalExpenses,

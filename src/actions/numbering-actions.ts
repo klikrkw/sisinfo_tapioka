@@ -70,7 +70,7 @@ export async function generateCustomDocumentNumber(docType: string, prefix: stri
   const pattern = rows.length ? rows[0].pattern : `${prefix}/{YYYY}/{MM}/{000001}`;
   
   const periodChanged = rows.length > 0 && rows[0].period != null && rows[0].period !== currentPeriod;
-  let lastNumber = rows.length && !periodChanged ? rows[0].lastNumber : 0;
+  const lastNumber = rows.length && !periodChanged ? rows[0].lastNumber : 0;
 
   const next = lastNumber + 1;
 

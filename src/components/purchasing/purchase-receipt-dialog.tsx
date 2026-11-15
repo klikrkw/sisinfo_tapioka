@@ -16,6 +16,7 @@ export type PurchaseReceiptData = {
   date: string;
   supplierName: string;
   materialName: string;
+  brand?: string;
   grossWeight: number;
   tareWeight: number;
   netWeight: number;
@@ -105,6 +106,7 @@ async function buildReceiptPdf(data: PurchaseReceiptData) {
   row("NO. POLISI", data.policeNumber || "-");
   row("SUPPLIER", data.supplierName);
   row("MATERIAL", data.materialName);
+  if (data.brand) row("MERK", data.brand);
   row("NO. PO/DO", data.poNumber || "-");
 
   // Masuk / Keluar rows

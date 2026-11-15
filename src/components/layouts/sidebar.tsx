@@ -29,6 +29,7 @@ import {
   Building2,
   ChevronDown,
   Leaf,
+  Layers,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,7 @@ const navItems: NavItem[] = [
       { label: "Stok Bahan Baku", href: "/warehouse", icon: Package },
       { label: "Stock Ledger", href: "/warehouse/movements", icon: FileText },
       { label: "Produk Jadi", href: "/warehouse/finished", icon: Box },
+      { label: "Layer HPP (FIFO)", href: "/warehouse/layers", icon: Layers },
     ],
   },
   {

@@ -57,6 +57,7 @@ async function main() {
       {
         code: "FG-001",
         name: "Tepung Tapioka",
+        brand: "Cap Roda Mas",
         type: "FINISHED_GOOD",
         unit: "Kg",
         defaultPrice: "10000",

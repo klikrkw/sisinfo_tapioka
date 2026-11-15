@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { stockMovements, warehouses, products } from "@/db/schema";
-import { eq, sql, and, desc } from "drizzle-orm";
+import { stockMovements, warehouses, products, stockLayers } from "@/db/schema";
+import { eq, sql, and, desc, gt } from "drizzle-orm";
 
 export async function getStockBalance(warehouseId: number, productId: number) {
   const last = await db
@@ -38,6 +38,29 @@ export async function getStockBalances(warehouseId?: number) {
     .groupBy(stockMovements.warehouseId, stockMovements.productId);
 
   return rows;
+}
+
+/** Layer FIFO yang masih punya sisa, untuk audit HPP persediaan. */
+export async function getStockLayers(onlyRemaining = true) {
+  return await db
+    .select({
+      id: stockLayers.id,
+      date: stockLayers.date,
+      sourceType: stockLayers.sourceType,
+      sourceNumber: stockLayers.sourceNumber,
+      productName: products.name,
+      productUnit: products.unit,
+      warehouseName: warehouses.name,
+      qtyIn: stockLayers.qtyIn,
+      qtyRemaining: stockLayers.qtyRemaining,
+      unitCost: stockLayers.unitCost,
+    })
+    .from(stockLayers)
+    .leftJoin(products, eq(products.id, stockLayers.productId))
+    .leftJoin(warehouses, eq(warehouses.id, stockLayers.warehouseId))
+    .where(onlyRemaining ? gt(stockLayers.qtyRemaining, "0") : undefined)
+    .orderBy(desc(stockLayers.date), desc(stockLayers.id))
+    .limit(300);
 }
 
 export async function getStockMovements(warehouseId?: number) {

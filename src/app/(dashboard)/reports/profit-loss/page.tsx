@@ -84,6 +84,12 @@ export default function ProfitLossPage() {
           <Row label="Total Biaya Produksi" value={d.totalProdCost} />
           <Row label="Dikurangi Nilai Ampas (by-product)" value={-d.byProductValue} tone="text-emerald-600 dark:text-emerald-400" />
           <Row label="Cost Tepung (Net)" value={d.netProdCost} bold />
+          {d.purchasedCogs > 0 && (
+            <>
+              <p className="pt-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">HPP Produk Jadi Dibeli (Terjual)</p>
+              <Row label="Harga beli rata-rata × qty terjual" value={d.purchasedCogs} />
+            </>
+          )}
           <Separator className="my-2" />
           <Row label="Laba Kotor" value={d.grossProfit} bold tone="text-emerald-600 dark:text-emerald-400" />
           <Separator className="my-2" />

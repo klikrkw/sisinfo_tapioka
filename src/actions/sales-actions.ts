@@ -2,6 +2,8 @@
 
 import { db } from "@/db";
 import { sales, saleItems, stockMovements, receivablePayments, cashTransactions, customers } from "@/db/schema";
+import { getProductUnitCosts } from "./costing-actions";
+import { consumeStockFifo } from "@/lib/inventory/layers";
 import { eq, desc, like, and, ne, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { generateDocumentNumber } from "@/actions/numbering-actions";
@@ -64,6 +66,10 @@ export async function createSale(data: {
     ? new Date(new Date(data.date).getTime() + data.termDays * 86400000)
     : null;
 
+  // HPP dibekukan saat transaksi dibuat agar margin historis tidak berubah.
+  const costMap = await getProductUnitCosts();
+  const costFor = (productId: number) => costMap[productId];
+
   try {
     await db.transaction(async (tx) => {
       // Validate stock before posting
@@ -96,7 +102,8 @@ export async function createSale(data: {
 
     for (const item of data.items) {
       const subtotal = item.quantity * item.price - item.discount;
-      await tx.insert(saleItems).values({
+      const fallbackCost = costFor(item.productId);
+      const [itemRes] = await tx.insert(saleItems).values({
         saleId,
         productId: item.productId,
         quantity: String(item.quantity),
@@ -104,6 +111,28 @@ export async function createSale(data: {
         discount: String(item.discount),
         subtotal: String(subtotal),
       });
+      const saleItemId = Number(itemRes.insertId);
+
+      // HPP FIFO: pakai layer stok paling lama, snapshot disimpan di item.
+      const fifo = await consumeStockFifo(tx, {
+        warehouseId: data.warehouseId,
+        productId: item.productId,
+        qty: item.quantity,
+        date: data.date,
+        refType: "SALE",
+        refId: saleId,
+        saleItemId,
+        fallbackUnitCost: fallbackCost?.unitCost ?? 0,
+      });
+
+      await tx
+        .update(saleItems)
+        .set({
+          hppPerUnit: String(fifo.unitCost),
+          hppAmount: String(fifo.amount),
+          costSource: "FIFO",
+        })
+        .where(eq(saleItems.id, saleItemId));
 
       const last = await tx
         .select()

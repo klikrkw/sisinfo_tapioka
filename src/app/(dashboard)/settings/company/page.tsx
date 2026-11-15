@@ -13,13 +13,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 
 import { useState } from "react";
-import Image from "next/image";
 
 export default function CompanySettingsPage() {
   const router = useRouter();
   const { data, isLoading } = useQuery({ queryKey: ["company-settings"], queryFn: getCompanySettings });
   const { register, handleSubmit, reset } = useForm();
-  const [logo, setLogo] = useState<string | null>(null);
+  const [uploadedLogo, setUploadedLogo] = useState<string | null>(null);
+  const logo = uploadedLogo ?? data?.logo ?? null;
 
   useEffect(() => {
     if (data) {
@@ -27,7 +27,6 @@ export default function CompanySettingsPage() {
         ...data,
         permitDate: data.permitDate ? new Date(data.permitDate).toISOString().slice(0, 10) : "",
       });
-      setLogo(data.logo);
     }
   }, [data, reset]);
 
@@ -41,7 +40,7 @@ export default function CompanySettingsPage() {
     const res = await fetch("/api/upload", { method: "POST", body: formData });
     const result = await res.json();
     if (result.success) {
-      setLogo(result.url);
+      setUploadedLogo(result.url);
       toast.success("Logo berhasil diunggah");
     } else {
       toast.error("Gagal mengunggah logo");

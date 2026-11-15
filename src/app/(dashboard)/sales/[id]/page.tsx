@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getSaleById, recordReceivablePayment } from "@/actions/sales-actions";
 import { getProducts } from "@/actions/master-actions";
 import { getCompanySettings } from "@/actions/settings-actions";
+import { getProductUnitCosts } from "@/actions/costing-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +32,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
   const { data: sale, isLoading } = useQuery({ queryKey: ["sale", saleId], queryFn: () => getSaleById(saleId) });
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: company } = useQuery({ queryKey: ["company-settings"], queryFn: getCompanySettings });
+  const { data: costMap } = useQuery({ queryKey: ["product-unit-costs"], queryFn: getProductUnitCosts });
 
   const payMutation = useMutation({
     mutationFn: () => recordReceivablePayment(saleId, Number(payAmount), payDate),
@@ -52,6 +54,20 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
     : Number(sale.totalAmount);
   const outstanding = isCredit ? Number(sale.totalAmount) - paidTotal : 0;
   const customer = sale.customer as { name: string; address: string | null; phone: string | null } | null;
+
+  const itemCost = (item: { productId: number; quantity: string | number; hppPerUnit?: string | null; hppAmount?: string | null; costSource?: string | null }) => {
+    // HPP yang dibekukan saat transaksi lebih akurat untuk riwayat.
+    if (item.costSource) {
+      const unitCost = Number(item.hppPerUnit) || 0;
+      const amount = Number(item.hppAmount) || (Number(item.quantity) || 0) * unitCost;
+      return { unitCost, amount, frozen: true, label: "HPP saat transaksi" };
+    }
+    const cost = costMap?.[item.productId];
+    if (!cost) return null;
+    return { ...cost, amount: (Number(item.quantity) || 0) * cost.unitCost, frozen: false };
+  };
+  const totalCogs = sale.items.reduce((a, it) => a + (itemCost(it)?.amount ?? 0), 0);
+  const totalMargin = Number(sale.totalAmount) - totalCogs;
 
   return (
     <>
@@ -95,19 +111,41 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
           <CardHeader><CardTitle>Item Penjualan</CardTitle></CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="text-right">Diskon</TableHead><TableHead className="text-right">Subtotal</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="text-right">Diskon</TableHead><TableHead className="text-right">Subtotal</TableHead><TableHead className="text-right">HPP/Kg</TableHead><TableHead className="text-right">Margin</TableHead></TableRow></TableHeader>
               <TableBody>
-                {sale.items.map((it) => (
-                  <TableRow key={it.id}>
-                    <TableCell className="font-medium">{productName(it.productId)}</TableCell>
-                    <TableCell className="text-right font-mono">{Number(it.quantity).toLocaleString("id-ID")}</TableCell>
-                    <TableCell className="text-right font-mono">{formatRp(Number(it.price))}</TableCell>
-                    <TableCell className="text-right font-mono">{formatRp(Number(it.discount))}</TableCell>
-                    <TableCell className="text-right font-mono font-semibold">{formatRp(Number(it.subtotal))}</TableCell>
-                  </TableRow>
-                ))}
+                {sale.items.map((it) => {
+                  const cost = itemCost(it);
+                  const margin = Number(it.subtotal) - (cost?.amount ?? 0);
+                  return (
+                    <TableRow key={it.id}>
+                      <TableCell className="font-medium">{productName(it.productId)}</TableCell>
+                      <TableCell className="text-right font-mono">{Number(it.quantity).toLocaleString("id-ID")}</TableCell>
+                      <TableCell className="text-right font-mono">{formatRp(Number(it.price))}</TableCell>
+                      <TableCell className="text-right font-mono">{formatRp(Number(it.discount))}</TableCell>
+                      <TableCell className="text-right font-mono font-semibold">{formatRp(Number(it.subtotal))}</TableCell>
+                      <TableCell className="text-right font-mono text-muted-foreground" title={cost?.label}>
+                        {cost ? formatRp(Math.round(cost.unitCost)) : "-"}
+                      </TableCell>
+                      <TableCell className={`text-right font-mono ${cost ? (margin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400") : "text-muted-foreground"}`}>
+                        {cost ? formatRp(Math.round(margin)) : "-"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                <TableRow>
+                  <TableCell colSpan={4} className="text-right text-xs text-muted-foreground">Estimasi HPP / Margin</TableCell>
+                  <TableCell className="text-right font-mono font-semibold">{formatRp(Number(sale.totalAmount))}</TableCell>
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatRp(Math.round(totalCogs))}</TableCell>
+                  <TableCell className={`text-right font-mono font-bold ${totalMargin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+                    {formatRp(Math.round(totalMargin))}
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              HPP/Kg dibekukan saat transaksi dibuat (snapshot), sehingga margin historis tidak berubah walau harga beli berubah.
+              Transaksi lama tanpa snapshot memakai HPP terkini sebagai estimasi.
+            </p>
           </CardContent>
         </Card>
 

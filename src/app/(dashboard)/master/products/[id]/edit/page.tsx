@@ -28,6 +28,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     if (product) {
       reset({
         ...product,
+        brand: product.brand ?? "",
         defaultPrice: product.defaultPrice ? Number(product.defaultPrice) : 0,
       });
     }
@@ -47,6 +48,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
     try {
       await updateProduct(id, {
         ...data,
+        brand: data.brand?.trim() ? data.brand.trim() : null,
         defaultPrice: data.defaultPrice ? String(data.defaultPrice) : "0",
       });
       toast.success("Produk berhasil diupdate");
@@ -82,6 +84,13 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           <div>
             <Label>Nama Produk</Label>
             <Input {...register("name", { required: true })} />
+          </div>
+          <div>
+            <Label>Merek / Brand (opsional)</Label>
+            <Input {...register("brand")} placeholder='Contoh: Cap Roda Mas' />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Merek dagang produk jadi, tampil pada pembelian &amp; surat jalan.
+            </p>
           </div>
           <div>
             <Label>Tipe Produk</Label>

@@ -43,6 +43,7 @@ export default function AddFinishedPurchasePage() {
       date: new Date().toISOString().slice(0, 10),
       supplierId: "",
       productId: "",
+      brand: "",
       warehouseId: "",
       grossWeight: 0,
       tareWeight: 0,
@@ -93,6 +94,7 @@ export default function AddFinishedPurchasePage() {
   const sackCount = Number(watch("sackCount")) || 0;
   const refactionPerSack = Number(watch("refactionPerSack")) || 0;
   const pricePerKg = Number(watch("pricePerKg")) || 0;
+  const brand = (watch("brand") as string) || "";
   const watchedDeductions = useWatch({ control, name: "deductions" }) ?? [];
 
   const calc = useMemo(() => {
@@ -166,6 +168,7 @@ export default function AddFinishedPurchasePage() {
         purchaseType: "FINISHED_GOOD",
         supplierId: Number(data.supplierId),
         rawMaterialId: Number(data.productId),
+        brand: data.brand?.trim() ? data.brand.trim() : undefined,
         warehouseId: Number(data.warehouseId),
         grossWeight: Number(data.grossWeight),
         tareWeight: Number(data.tareWeight),
@@ -383,15 +386,27 @@ export default function AddFinishedPurchasePage() {
                     required: true,
                     onChange: (e) => {
                       const prod = finishedProducts.find((p) => String(p.id) === e.target.value);
-                      if (prod) setValue("pricePerKg", Number(prod.defaultPrice));
+                      if (prod) {
+                        setValue("pricePerKg", Number(prod.defaultPrice));
+                        setValue("brand", prod.brand ?? "");
+                      }
                     },
                   })}
                 >
                   <option value="">Pilih Produk</option>
                   {finishedProducts.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.unit})</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name}{p.brand ? ` — ${p.brand}` : ""} ({p.unit})
+                    </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <Label>Merek / Brand</Label>
+                <Input {...register("brand")} placeholder='Contoh: Cap Roda Mas' />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Terisi otomatis dari master produk, bisa diubah.
+                </p>
               </div>
               <div className="sm:col-span-2">
                 <Label>Gudang Tujuan</Label>
@@ -629,6 +644,12 @@ export default function AddFinishedPurchasePage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
+            {brand.trim() && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Merek</span>
+                <span className="font-medium">{brand.trim()}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Berat bersih</span>
               <span className="font-mono font-semibold">{calc.netWeight.toLocaleString("id-ID")} Kg</span>

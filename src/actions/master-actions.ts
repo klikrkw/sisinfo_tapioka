@@ -74,7 +74,9 @@ export async function getProducts() {
 
 export async function getProductsPaginated(page: number, limit: number, search?: string) {
   const offset = (page - 1) * limit;
-  const whereCond = search ? or(like(products.name, `%${search}%`), like(products.code, `%${search}%`)) : undefined;
+  const whereCond = search
+    ? or(like(products.name, `%${search}%`), like(products.code, `%${search}%`), like(products.brand, `%${search}%`))
+    : undefined;
 
   const data = await db.select().from(products).where(whereCond).limit(limit).offset(offset);
   const all = await db.select().from(products).where(whereCond);

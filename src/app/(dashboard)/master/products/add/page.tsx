@@ -13,7 +13,7 @@ import { useEffect } from "react";
 export default function AddProductPage() {
   const router = useRouter();
   const { register, handleSubmit, setValue } = useForm({
-    defaultValues: { type: "RAW_MATERIAL", unit: "Kg", code: "", name: "", defaultPrice: "" }
+    defaultValues: { type: "RAW_MATERIAL", unit: "Kg", code: "", name: "", brand: "", defaultPrice: "" }
   });
 
   useEffect(() => {
@@ -26,6 +26,7 @@ export default function AddProductPage() {
     try {
       await createProduct({
         ...data,
+        brand: data.brand?.trim() ? data.brand.trim() : null,
         defaultPrice: data.defaultPrice ? String(data.defaultPrice) : "0",
       });
       toast.success("Produk berhasil ditambah");
@@ -49,6 +50,13 @@ export default function AddProductPage() {
           <div>
             <Label>Nama Produk</Label>
             <Input {...register("name", { required: true })} placeholder="Ketela Segar / Tepung Tapioka" />
+          </div>
+          <div>
+            <Label>Merek / Brand (opsional)</Label>
+            <Input {...register("brand")} placeholder='Contoh: Cap Roda Mas' />
+            <p className="mt-1 text-xs text-muted-foreground">
+              Merek dagang produk jadi, tampil pada pembelian &amp; surat jalan.
+            </p>
           </div>
           <div>
             <Label>Tipe Produk</Label>

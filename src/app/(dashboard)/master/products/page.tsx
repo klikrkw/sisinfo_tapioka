@@ -57,6 +57,7 @@ export default function ProductsPage() {
               <TableRow>
                 <TableHead>Kode</TableHead>
                 <TableHead>Nama</TableHead>
+                <TableHead>Merek</TableHead>
                 <TableHead>Tipe</TableHead>
                 <TableHead>Satuan</TableHead>
                 <TableHead className="text-right">Harga Default</TableHead>
@@ -66,7 +67,7 @@ export default function ProductsPage() {
             <TableBody>
               {data?.data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                     Tidak ada data
                   </TableCell>
                 </TableRow>
@@ -75,6 +76,7 @@ export default function ProductsPage() {
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.code}</TableCell>
                   <TableCell>{p.name}</TableCell>
+                  <TableCell>{p.brand || "-"}</TableCell>
                   <TableCell><Badge variant="outline">{typeLabel[p.type] ?? p.type}</Badge></TableCell>
                   <TableCell>{p.unit}</TableCell>
                   <TableCell className="text-right">Rp {Number(p.defaultPrice || 0).toLocaleString('id-ID')}</TableCell>

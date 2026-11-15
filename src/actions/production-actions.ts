@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { eq, desc, and, like } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { addStockLayer, consumeStockFifo } from "@/lib/inventory/layers";
 
 export async function getLatestHppByProduct() {
   const completed = await db
@@ -123,6 +124,7 @@ export async function createProductionBatch(data: {
 
     // Auto-hitung nilai bahan baku dari input dan masukkan sebagai biaya produksi
     let totalInputQty = 0;
+    const inputFallbackCosts: Record<number, number> = {};
     for (const input of data.inputs) {
       totalInputQty += input.quantity;
       const lastPurchase = await tx
@@ -136,6 +138,7 @@ export async function createProductionBatch(data: {
         const prod = (await tx.select().from(products).where(eq(products.id, input.productId)).limit(1))[0];
         unitCost = Number(prod?.defaultPrice ?? 0);
       }
+      inputFallbackCosts[input.productId] = unitCost;
       const materialAmount = input.quantity * unitCost;
       if (materialAmount > 0) {
         const prod = (await tx.select().from(products).where(eq(products.id, input.productId)).limit(1))[0];
@@ -189,6 +192,14 @@ export async function createProductionBatch(data: {
 
     // Post stock movements only if Completed
     if ((data.status ?? "Completed") === "Completed") {
+      const costRows = await tx.select().from(productionCosts).where(eq(productionCosts.batchId, batchId));
+      const totalCost = costRows.reduce((a, c) => a + Number(c.amount), 0);
+      const byVal = data.outputs
+        .filter((o) => o.isByProduct)
+        .reduce((a, o) => a + o.quantity * o.pricePerUnit, 0);
+      const mainQty = data.outputs.filter((o) => !o.isByProduct).reduce((a, o) => a + o.quantity, 0);
+      const hppPerKg = mainQty > 0 ? (totalCost - byVal) / mainQty : 0;
+
       for (const input of data.inputs) {
         const last = await tx
           .select()
@@ -205,6 +216,16 @@ export async function createProductionBatch(data: {
           qtyIn: "0",
           qtyOut: String(input.quantity),
           balance: String(prev - input.quantity),
+        });
+
+        await consumeStockFifo(tx, {
+          warehouseId: input.warehouseId,
+          productId: input.productId,
+          qty: input.quantity,
+          date: data.date,
+          refType: "PRODUCTION_USAGE",
+          refId: batchId,
+          fallbackUnitCost: inputFallbackCosts[input.productId] ?? 0,
         });
       }
       for (const output of data.outputs) {
@@ -223,6 +244,18 @@ export async function createProductionBatch(data: {
           qtyIn: String(output.quantity),
           qtyOut: "0",
           balance: String(prev + output.quantity),
+        });
+
+        // HPP per batch: produk utama memakai HPP batch, sampingan memakai harga taksiran.
+        await addStockLayer(tx, {
+          warehouseId: output.warehouseId,
+          productId: output.productId,
+          sourceType: "PRODUCTION",
+          sourceId: batchId,
+          sourceNumber: data.number,
+          date: data.date,
+          qty: output.quantity,
+          unitCost: output.isByProduct ? output.pricePerUnit : hppPerKg,
         });
       }
     }

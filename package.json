@@ -8,6 +8,9 @@
     "start": "next start -p 3000",
     "db:seed": "tsx src/db/seed.ts",
     "db:seed-demo": "tsx src/db/seed-demo.ts",
+    "db:seed-brands": "tsx src/db/seed-brands.ts",
+    "db:backfill-hpp": "tsx src/db/backfill-sale-hpp.ts",
+    "db:backfill-layers": "tsx src/db/backfill-stock-layers.ts",
     "db:patch": "node scripts/apply-patches.mjs",
     "db:patch:dry": "node scripts/apply-patches.mjs --dry-run",
     "lint": "eslint"

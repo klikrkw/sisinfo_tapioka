@@ -6,7 +6,7 @@ import { peekCustomDocumentNumber, generateCustomDocumentNumber } from "@/action
 import { getDocumentSequences } from "@/actions/settings-actions";
 import { getProducts, getWarehouses } from "@/actions/master-actions";
 import { getStockBalances } from "@/actions/warehouse-actions";
-import { getLatestHppByProduct } from "@/actions/production-actions";
+import { getProductUnitCosts } from "@/actions/costing-actions";
 import { getCustomers } from "@/actions/master-others";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +40,7 @@ export default function AddSalePage() {
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: stockBalances } = useQuery({ queryKey: ["stock-balances-all"], queryFn: () => getStockBalances() });
-  const { data: hppMap } = useQuery({ queryKey: ["latest-hpp-by-product"], queryFn: getLatestHppByProduct });
+  const { data: hppMap } = useQuery({ queryKey: ["product-unit-costs"], queryFn: getProductUnitCosts });
   const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
 
   const salesPrefix = useMemo(() => {
@@ -52,7 +52,8 @@ export default function AddSalePage() {
     peekCustomDocumentNumber("SALES", salesPrefix).then((n) => setValue("number", n));
   }, [setValue, salesPrefix]);
 
-  const hppFor = (productId: string | number) => hppMap?.[Number(productId)] ?? 0;
+  const hppFor = (productId: string | number) => hppMap?.[Number(productId)]?.unitCost ?? 0;
+  const costInfoFor = (productId: string | number) => hppMap?.[Number(productId)];
 
   const selectedWarehouseId = watch("warehouseId");
   const stockFor = (productId: string | number) => {
@@ -207,7 +208,12 @@ export default function AddSalePage() {
                       </span>
                     )}
                     <span className="text-muted-foreground">
-                      HPP terakhir: {hpp > 0 ? `Rp ${Math.round(hpp).toLocaleString("id-ID")}/Kg` : "belum ada data produksi"}
+                      {hpp > 0
+                        ? `${costInfoFor(pid)?.label}: Rp ${Math.round(hpp).toLocaleString("id-ID")}/Kg`
+                        : "HPP belum tersedia (belum ada produksi/pembelian)"}
+                      {costInfoFor(pid)?.source === "PRODUCTION" && costInfoFor(pid)?.purchaseCost
+                        ? ` · harga beli Rp ${Math.round(costInfoFor(pid)!.purchaseCost!).toLocaleString("id-ID")}/Kg`
+                        : ""}
                     </span>
                     {belowHpp && (
                       <span className="inline-flex items-center gap-1.5 font-medium text-destructive">
