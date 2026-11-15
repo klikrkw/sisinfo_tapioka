@@ -15,16 +15,23 @@ Folder ini menyimpan perubahan struktur database untuk **produksi**, menggantika
 
 ```bash
 cd /var/www/html/web/projects/sisinfo_tapioka
-set -a; source .env; set +a
 
 # lihat patch yang belum diterapkan
-node scripts/apply-patches.mjs --dry-run
+npm run db:patch:dry
 
-# terapkan
-node scripts/apply-patches.mjs
+# terapkan (DATABASE_URL dibaca otomatis dari .env)
+npm run db:patch
 
 # verifikasi
 mysql -u webuser -p db_tapioka -e "SELECT * FROM schema_patches ORDER BY applied_at;"
+```
+
+Perintah setara tanpa npm:
+
+```bash
+set -a; source .env; set +a
+node scripts/apply-patches.mjs --dry-run
+node scripts/apply-patches.mjs
 ```
 
 ## Runbook deploy produksi
@@ -35,8 +42,8 @@ mysqldump --single-transaction --routines --triggers \
   -u webuser -p db_tapioka > /tmp/opencode/db_$(date +%F_%H%M).sql
 
 # 2. Cek lalu terapkan patch
-node scripts/apply-patches.mjs --dry-run
-node scripts/apply-patches.mjs
+npm run db:patch:dry
+npm run db:patch
 
 # 3. Build & restart aplikasi
 npm run build && pm2 restart sisinfo_tapioka
