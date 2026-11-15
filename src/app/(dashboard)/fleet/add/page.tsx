@@ -4,17 +4,20 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { createShipment } from "@/actions/fleet-actions";
 import { peekCustomDocumentNumber, generateCustomDocumentNumber } from "@/actions/numbering-actions";
 import { getDocumentSequences } from "@/actions/settings-actions";
-import { getVehicles, getDrivers } from "@/actions/master-others";
+import { getVehicles, getDrivers, createDriver } from "@/actions/master-others";
+import { getNextMasterCode } from "@/actions/master-actions";
+import { getSalesPaginated } from "@/actions/sales-actions";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { Plus, Trash2, UserPlus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 const COST_CATEGORIES = ["Solar", "Sopir", "Tol", "Parkir", "Servis", "Ban", "Oli", "Reparasi", "Pajak", "Asuransi", "Lainnya"];
 
@@ -24,6 +27,7 @@ export default function AddShipmentPage() {
     defaultValues: {
       number: "",
       date: new Date().toISOString().slice(0, 10),
+      saleId: "",
       vehicleId: "",
       driverId: "",
       destination: "",
@@ -39,6 +43,36 @@ export default function AddShipmentPage() {
   const { fields, append, remove } = useFieldArray({ control, name: "costs" });
   const { data: vehicles } = useQuery({ queryKey: ["vehicles"], queryFn: getVehicles });
   const { data: drivers } = useQuery({ queryKey: ["drivers"], queryFn: getDrivers });
+  const { data: salesList } = useQuery({
+    queryKey: ["sales-for-shipment"],
+    queryFn: () => getSalesPaginated(1, 100),
+  });
+
+  const queryClient = useQueryClient();
+  const [driverOpen, setDriverOpen] = useState(false);
+  const [newDriver, setNewDriver] = useState({ name: "", phone: "", licenseNumber: "", licenseType: "B2" });
+
+  const createDriverMut = useMutation({
+    mutationFn: async () => {
+      const code = (await getNextMasterCode("drivers")) ?? `DRV-${Date.now()}`;
+      return await createDriver({
+        code,
+        name: newDriver.name.trim(),
+        phone: newDriver.phone || null,
+        licenseNumber: newDriver.licenseNumber || null,
+        licenseType: newDriver.licenseType || null,
+        status: true,
+      });
+    },
+    onSuccess: async (id) => {
+      toast.success("Sopir berhasil ditambahkan");
+      await queryClient.invalidateQueries({ queryKey: ["drivers"] });
+      if (id) setValue("driverId", String(id));
+      setDriverOpen(false);
+      setNewDriver({ name: "", phone: "", licenseNumber: "", licenseType: "B2" });
+    },
+    onError: () => toast.error("Gagal menambah sopir"),
+  });
   const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
 
   const shipmentPrefix = useMemo(() => {
@@ -61,6 +95,7 @@ export default function AddShipmentPage() {
       await createShipment({
         number: finalNumber,
         date: data.date,
+        saleId: data.saleId ? Number(data.saleId) : null,
         vehicleId: Number(data.vehicleId),
         driverId: Number(data.driverId),
         destination: data.destination,
@@ -100,11 +135,39 @@ export default function AddShipmentPage() {
               </select>
             </div>
             <div>
-              <Label>Sopir</Label>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <Label>Sopir</Label>
+                <button
+                  type="button"
+                  onClick={() => setDriverOpen(true)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-accent hover:underline"
+                >
+                  <UserPlus className="h-3.5 w-3.5" /> Tambah Sopir
+                </button>
+              </div>
               <select className={selectClass} {...register("driverId", { required: true })}>
                 <option value="">Pilih Sopir</option>
                 {drivers?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
               </select>
+              {drivers && drivers.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  Belum ada data sopir. Klik <span className="font-semibold">Tambah Sopir</span> untuk menambahkan.
+                </p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Transaksi Penjualan (opsional)</Label>
+              <select className={selectClass} {...register("saleId")}>
+                <option value="">Tidak ditautkan</option>
+                {salesList?.data?.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.number} · {new Date(s.date).toLocaleDateString("id-ID")} · Rp {Number(s.totalAmount).toLocaleString("id-ID")}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Menautkan pengiriman ini ke transaksi penjualan agar tampil di surat jalan.
+              </p>
             </div>
             <div className="sm:col-span-2"><Label>Tujuan</Label><Input {...register("destination")} placeholder="Alamat pengiriman" /></div>
             <div><Label>KM Awal</Label><Input type="number" step="0.01" {...register("kmStart")} /></div>
@@ -157,6 +220,62 @@ export default function AddShipmentPage() {
             <Button type="submit">Simpan</Button>
           </div>
         </form>
+
+        <Dialog open={driverOpen} onOpenChange={setDriverOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Tambah Sopir Baru</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div>
+                <Label>Nama Sopir *</Label>
+                <Input
+                  value={newDriver.name}
+                  onChange={(e) => setNewDriver({ ...newDriver, name: e.target.value })}
+                  placeholder="Nama lengkap"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <Label>Telepon</Label>
+                  <Input
+                    value={newDriver.phone}
+                    onChange={(e) => setNewDriver({ ...newDriver, phone: e.target.value })}
+                    placeholder="08xx"
+                  />
+                </div>
+                <div>
+                  <Label>Jenis SIM</Label>
+                  <select
+                    className={selectClass}
+                    value={newDriver.licenseType}
+                    onChange={(e) => setNewDriver({ ...newDriver, licenseType: e.target.value })}
+                  >
+                    {["A", "B1", "B2", "C"].map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <Label>No. SIM</Label>
+                <Input
+                  value={newDriver.licenseNumber}
+                  onChange={(e) => setNewDriver({ ...newDriver, licenseNumber: e.target.value })}
+                  placeholder="Nomor SIM"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" type="button" onClick={() => setDriverOpen(false)}>Batal</Button>
+              <Button
+                type="button"
+                onClick={() => createDriverMut.mutate()}
+                disabled={!newDriver.name.trim() || createDriverMut.isPending}
+              >
+                {createDriverMut.isPending ? "Menyimpan..." : "Simpan Sopir"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

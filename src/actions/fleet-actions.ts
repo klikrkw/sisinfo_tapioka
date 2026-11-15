@@ -38,6 +38,28 @@ export async function getShipmentById(id: number) {
   return { ...rows[0], costs, fuel };
 }
 
+export async function getShipmentBySaleId(saleId: number) {
+  const rows = await db
+    .select({
+      id: shipments.id,
+      number: shipments.number,
+      date: shipments.date,
+      status: shipments.status,
+      destination: shipments.destination,
+      vehiclePolice: vehicles.policeNumber,
+      vehicleBrand: vehicles.brand,
+      driverName: drivers.name,
+      driverPhone: drivers.phone,
+    })
+    .from(shipments)
+    .leftJoin(vehicles, eq(shipments.vehicleId, vehicles.id))
+    .leftJoin(drivers, eq(shipments.driverId, drivers.id))
+    .where(eq(shipments.saleId, saleId))
+    .orderBy(desc(shipments.id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function createShipment(data: {
   number: string;
   date: string;

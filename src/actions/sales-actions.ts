@@ -2,8 +2,9 @@
 
 import { db } from "@/db";
 import { sales, saleItems, stockMovements, receivablePayments, cashTransactions, customers } from "@/db/schema";
-import { eq, desc, like, and, ne } from "drizzle-orm";
+import { eq, desc, like, and, ne, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { generateDocumentNumber } from "@/actions/numbering-actions";
 
 export async function getSalesPaginated(page: number, limit: number, search?: string) {
   const offset = (page - 1) * limit;
@@ -20,6 +21,32 @@ export async function getSaleById(id: number) {
   const payments = await db.select().from(receivablePayments).where(eq(receivablePayments.saleId, id));
   const customer = (await db.select().from(customers).where(eq(customers.id, rows[0].customerId)).limit(1))[0] ?? null;
   return { ...rows[0], items, payments, customer };
+}
+
+/**
+ * Ambil nomor surat jalan milik penjualan. Jika belum ada, buat dari
+ * document_sequences (docType DELIVERY_NOTE) lalu simpan agar stabil.
+ */
+export async function getOrCreateDeliveryNoteNumber(saleId: number) {
+  const rows = await db.select().from(sales).where(eq(sales.id, saleId)).limit(1);
+  if (rows.length === 0) return null;
+  if (rows[0].deliveryNoteNumber) return rows[0].deliveryNoteNumber;
+
+  const number = await generateDocumentNumber("DELIVERY_NOTE");
+
+  // Hanya isi bila masih kosong (hindari menimpa nomor yang sudah dibuat paralel).
+  await db
+    .update(sales)
+    .set({ deliveryNoteNumber: number })
+    .where(and(eq(sales.id, saleId), isNull(sales.deliveryNoteNumber)));
+
+  const saved = await db
+    .select({ number: sales.deliveryNoteNumber })
+    .from(sales)
+    .where(eq(sales.id, saleId))
+    .limit(1);
+
+  return saved[0]?.number ?? number;
 }
 
 export async function createSale(data: {

@@ -1,14 +1,16 @@
 "use server";
 
 import { db } from "@/db";
-import { purchases, stockMovements, purchaseDeductions, payablePayments, cashTransactions } from "@/db/schema";
+import { purchases, stockMovements, purchaseDeductions, payablePayments, cashTransactions, products } from "@/db/schema";
 import { eq, and, or, like, desc } from "drizzle-orm";
-import { calculatePurchaseWeight, calculatePurchaseAmount } from "@/lib/calculations/purchasing";
+import { calculatePurchaseWeight, calculatePurchaseAmount, splitDeductions } from "@/lib/calculations/purchasing";
 import { revalidatePath } from "next/cache";
 
 export async function getPurchasesPaginated(page: number, limit: number, search?: string) {
   const offset = (page - 1) * limit;
-  const whereCond = search ? like(purchases.number, `%${search}%`) : undefined;
+  const whereCond = search
+    ? and(eq(purchases.purchaseType, "RAW_MATERIAL"), like(purchases.number, `%${search}%`))
+    : eq(purchases.purchaseType, "RAW_MATERIAL");
   const data = await db
     .select()
     .from(purchases)
@@ -17,6 +19,39 @@ export async function getPurchasesPaginated(page: number, limit: number, search?
     .limit(limit)
     .offset(offset);
   const all = await db.select().from(purchases).where(whereCond);
+  return { data, total: all.length };
+}
+
+export async function getFinishedPurchasesPaginated(page: number, limit: number, search?: string) {
+  const offset = (page - 1) * limit;
+  const whereCond = search
+    ? and(eq(purchases.purchaseType, "FINISHED_GOOD"), like(purchases.number, `%${search}%`))
+    : eq(purchases.purchaseType, "FINISHED_GOOD");
+  const data = await db
+    .select({
+      id: purchases.id,
+      number: purchases.number,
+      date: purchases.date,
+      productName: products.name,
+      productUnit: products.unit,
+      netWeight: purchases.netWeight,
+      payableWeight: purchases.payableWeight,
+      sackCount: purchases.sackCount,
+      pricePerKg: purchases.pricePerKg,
+      baseAmount: purchases.baseAmount,
+      totalDeductions: purchases.totalDeductions,
+      totalCosts: purchases.totalCosts,
+      netAmount: purchases.netAmount,
+      status: purchases.status,
+    })
+    .from(purchases)
+    .leftJoin(products, eq(products.id, purchases.rawMaterialId))
+    .where(whereCond)
+    .orderBy(desc(purchases.id))
+    .limit(limit)
+    .offset(offset);
+
+  const all = await db.select({ id: purchases.id }).from(purchases).where(whereCond);
   return { data, total: all.length };
 }
 
@@ -110,9 +145,10 @@ export async function updatePurchaseTransaction(
     exitDate?: string;
     exitTime?: string;
     refactionPercent: number;
+    sackCount?: number;
     pricePerKg: number;
     notes?: string;
-    deductions?: { deductionTypeId: number; name: string; calculationType: string; quantity: number; rate: number; amount: number }[];
+    deductions?: { deductionTypeId: number; name: string; calculationType: string; impactType?: string; quantity: number; rate: number; amount: number }[];
   }
 ) {
   const existing = await db.select().from(purchases).where(eq(purchases.id, id)).limit(1);
@@ -126,8 +162,13 @@ export async function updatePurchaseTransaction(
     formData.tareWeight,
     formData.refactionPercent
   );
-  const totalDeductions = formData.deductions?.reduce((acc, d) => acc + d.amount, 0) ?? 0;
-  const { baseAmount, netAmount } = calculatePurchaseAmount(payableWeight, formData.pricePerKg, totalDeductions);
+  const { deductions: totalDeductions, costs: totalCosts } = splitDeductions(formData.deductions ?? []);
+  const { baseAmount, netAmount } = calculatePurchaseAmount(
+    payableWeight,
+    formData.pricePerKg,
+    totalDeductions,
+    totalCosts
+  );
 
   await db.transaction(async (tx) => {
     await tx.update(purchases).set({
@@ -147,9 +188,11 @@ export async function updatePurchaseTransaction(
       refactionPercent: String(formData.refactionPercent),
       refactionWeight: String(refactionWeight),
       payableWeight: String(payableWeight),
+      sackCount: String(formData.sackCount ?? 0),
       pricePerKg: String(formData.pricePerKg),
       baseAmount: String(baseAmount),
       totalDeductions: String(totalDeductions),
+      totalCosts: String(totalCosts),
       netAmount: String(netAmount),
       notes: formData.notes,
     }).where(eq(purchases.id, id));
@@ -162,6 +205,7 @@ export async function updatePurchaseTransaction(
           deductionTypeId: d.deductionTypeId,
           name: d.name,
           calculationType: d.calculationType as any,
+          impactType: (d.impactType ?? "SUPPLIER_DEDUCTION") as any,
           quantity: String(d.quantity),
           rate: String(d.rate),
           amount: String(d.amount),
@@ -175,6 +219,7 @@ export async function updatePurchaseTransaction(
 
 export async function createPurchaseTransaction(formData: {
   number: string;
+  purchaseType?: "RAW_MATERIAL" | "FINISHED_GOOD";
   date: string;
   supplierId: number;
   rawMaterialId: number;
@@ -187,9 +232,10 @@ export async function createPurchaseTransaction(formData: {
   exitDate?: string;
   exitTime?: string;
   refactionPercent: number;
+  sackCount?: number;
   pricePerKg: number;
   notes?: string;
-  deductions?: { deductionTypeId: number; name: string; calculationType: string; quantity: number; rate: number; amount: number }[];
+  deductions?: { deductionTypeId: number; name: string; calculationType: string; impactType?: string; quantity: number; rate: number; amount: number }[];
 }) {
   const { netWeight, refactionWeight, payableWeight } = calculatePurchaseWeight(
     formData.grossWeight,
@@ -197,12 +243,18 @@ export async function createPurchaseTransaction(formData: {
     formData.refactionPercent
   );
 
-  const totalDeductions = formData.deductions?.reduce((acc, d) => acc + d.amount, 0) ?? 0;
-  const { baseAmount, netAmount } = calculatePurchaseAmount(payableWeight, formData.pricePerKg, totalDeductions);
+  const { deductions: totalDeductions, costs: totalCosts } = splitDeductions(formData.deductions ?? []);
+  const { baseAmount, netAmount } = calculatePurchaseAmount(
+    payableWeight,
+    formData.pricePerKg,
+    totalDeductions,
+    totalCosts
+  );
 
   await db.transaction(async (tx) => {
     const [res] = await tx.insert(purchases).values({
       number: formData.number,
+      purchaseType: formData.purchaseType ?? "RAW_MATERIAL",
       date: new Date(formData.date),
       supplierId: formData.supplierId,
       rawMaterialId: formData.rawMaterialId,
@@ -218,9 +270,11 @@ export async function createPurchaseTransaction(formData: {
       refactionPercent: String(formData.refactionPercent),
       refactionWeight: String(refactionWeight),
       payableWeight: String(payableWeight),
+      sackCount: String(formData.sackCount ?? 0),
       pricePerKg: String(formData.pricePerKg),
       baseAmount: String(baseAmount),
       totalDeductions: String(totalDeductions),
+      totalCosts: String(totalCosts),
       netAmount: String(netAmount),
       status: "Approved",
       notes: formData.notes,
@@ -235,6 +289,7 @@ export async function createPurchaseTransaction(formData: {
           deductionTypeId: d.deductionTypeId,
           name: d.name,
           calculationType: d.calculationType as any,
+          impactType: (d.impactType ?? "SUPPLIER_DEDUCTION") as any,
           quantity: String(d.quantity),
           rate: String(d.rate),
           amount: String(d.amount),
@@ -264,5 +319,6 @@ export async function createPurchaseTransaction(formData: {
   });
 
   revalidatePath("/purchasing");
+  revalidatePath("/purchasing/finished");
   revalidatePath("/warehouse");
 }

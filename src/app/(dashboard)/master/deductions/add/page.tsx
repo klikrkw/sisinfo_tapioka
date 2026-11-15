@@ -12,6 +12,7 @@ const fields: Field[] = [
     options: [
       { value: "fixed", label: "Fixed (Tetap)" },
       { value: "per_kg", label: "Per Kg" },
+      { value: "per_sack", label: "Per Sak" },
       { value: "percentage", label: "Persentase (%)" },
     ],
   },
@@ -26,6 +27,15 @@ const fields: Field[] = [
       { value: "OTHER", label: "Lainnya" },
     ],
   },
+  {
+    name: "appliesTo",
+    label: "Digunakan Pada",
+    options: [
+      { value: "RAW_MATERIAL", label: "Pembelian Ketela (bahan baku)" },
+      { value: "FINISHED_GOOD", label: "Pembelian Produk Jadi" },
+      { value: "BOTH", label: "Keduanya" },
+    ],
+  },
 ];
 
 export default function AddDeductionPage() {
@@ -33,7 +43,7 @@ export default function AddDeductionPage() {
     <MasterForm
       title="Tambah Jenis Potongan"
       fields={fields}
-      defaultValues={{ code: "", name: "", calculationType: "per_kg", defaultValue: "0", impactType: "SUPPLIER_DEDUCTION" }}
+      defaultValues={{ code: "", name: "", calculationType: "per_kg", defaultValue: "0", impactType: "SUPPLIER_DEDUCTION", appliesTo: "BOTH" }}
       submit={async (data) => await createDeductionType(data as any)}
       backHref="/master/deductions"
     />

@@ -38,7 +38,7 @@ export default function EditDriverPage({ params }: { params: Promise<{ id: strin
       initialData={initialData}
       submit={async (data) => await updateDriver(id, data as any)}
       deleteAction={async () => await deleteDriver(id)}
-      backHref="/master/fleet"
+      backHref="/master/fleet/drivers"
     />
   );
 }

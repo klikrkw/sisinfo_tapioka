@@ -12,8 +12,10 @@ import { toast } from "sonner";
 
 const DEFAULTS = [
   { docType: "PURCHASE", prefix: "PB", pattern: "PB/{YYYY}/{MM}/{000001}" },
+  { docType: "PURCHASE_FINISHED", prefix: "PBF", pattern: "PBF/{YYYY}/{MM}/{000001}" },
   { docType: "PRODUCTION", prefix: "PRD", pattern: "PRD/{YYYY}/{MM}/{000001}" },
   { docType: "SALES", prefix: "PJ", pattern: "PJ/{YYYY}/{MM}/{000001}" },
+  { docType: "DELIVERY_NOTE", prefix: "SJ", pattern: "SJ/{YYYY}/{MM}/{000001}" },
   { docType: "SHIPMENT", prefix: "DO", pattern: "DO/{YYYY}/{MM}/{000001}" },
   { docType: "PAYMENT", prefix: "PAY", pattern: "PAY/{YYYY}/{MM}/{000001}" },
 ];

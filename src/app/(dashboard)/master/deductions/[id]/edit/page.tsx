@@ -14,6 +14,7 @@ const fields: Field[] = [
     options: [
       { value: "fixed", label: "Fixed (Tetap)" },
       { value: "per_kg", label: "Per Kg" },
+      { value: "per_sack", label: "Per Sak" },
       { value: "percentage", label: "Persentase (%)" },
     ],
   },
@@ -26,6 +27,23 @@ const fields: Field[] = [
       { value: "PURCHASE_COST", label: "Menambah Biaya Pembelian" },
       { value: "PRODUCTION_COST", label: "Menambah Biaya Produksi" },
       { value: "OTHER", label: "Lainnya" },
+    ],
+  },
+  {
+    name: "appliesTo",
+    label: "Digunakan Pada",
+    options: [
+      { value: "RAW_MATERIAL", label: "Pembelian Ketela (bahan baku)" },
+      { value: "FINISHED_GOOD", label: "Pembelian Produk Jadi" },
+      { value: "BOTH", label: "Keduanya" },
+    ],
+  },
+  {
+    name: "isActive",
+    label: "Status",
+    options: [
+      { value: "true", label: "Aktif" },
+      { value: "false", label: "Nonaktif" },
     ],
   },
 ];
@@ -45,9 +63,11 @@ export default function EditDeductionPage({ params }: { params: Promise<{ id: st
     <MasterForm
       title="Edit Jenis Potongan"
       fields={fields}
-      defaultValues={ded || {}}
-      initialData={ded}
-      submit={async (data) => await updateDeductionType(id, data as any)}
+      defaultValues={ded ? { ...ded, isActive: String(ded.isActive) } : {}}
+      initialData={ded ? { ...ded, isActive: String(ded.isActive) } : null}
+      submit={async (data) =>
+        await updateDeductionType(id, { ...(data as any), isActive: data.isActive === "true" })
+      }
       deleteAction={async () => await deleteDeductionType(id)}
       backHref="/master/deductions"
     />

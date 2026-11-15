@@ -52,7 +52,8 @@ const navItems: NavItem[] = [
       { label: "Produk", href: "/master/products", icon: Box },
       { label: "Gudang", href: "/master/warehouses", icon: Store },
       { label: "Pelanggan", href: "/master/customers", icon: Building2 },
-      { label: "Armada & Sopir", href: "/master/fleet", icon: Truck },
+      { label: "Armada / Truk", href: "/master/fleet", icon: Truck },
+      { label: "Sopir", href: "/master/fleet/drivers", icon: Users },
       { label: "Jenis Potongan", href: "/master/deductions", icon: Tags },
     ],
   },
@@ -62,6 +63,7 @@ const navItems: NavItem[] = [
     icon: ShoppingCart,
     children: [
       { label: "Pembelian Ketela", href: "/purchasing", icon: ShoppingCart },
+      { label: "Pembelian Produk Jadi", href: "/purchasing/finished", icon: Package },
       { label: "Penimbangan & Rifaksi", href: "/purchasing/weighing", icon: Scale },
       { label: "Potongan", href: "/purchasing/deductions", icon: ReceiptText },
       { label: "Hutang Supplier", href: "/purchasing/payables", icon: CreditCard },

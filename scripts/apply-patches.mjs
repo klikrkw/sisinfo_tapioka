@@ -39,7 +39,9 @@ async function main() {
     .filter((f) => f.endsWith(".sql") && !f.endsWith(".down.sql"))
     .sort();
 
-  const conn = await mysql.createConnection(connectionOptions());
+  const target = connectionOptions();
+  console.log(`Target DB: ${target.user}@${target.host}:${target.port}/${target.database}`);
+  const conn = await mysql.createConnection(target);
   try {
     let applied = new Set();
     try {

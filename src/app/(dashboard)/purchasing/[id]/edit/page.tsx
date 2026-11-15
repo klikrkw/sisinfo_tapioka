@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import { getPurchaseById, updatePurchaseTransaction } from "@/actions/purchasing-actions";
 import { getSuppliers, getProducts, getWarehouses } from "@/actions/master-actions";
 import { getDeductionTypes } from "@/actions/master-others";
@@ -13,7 +13,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
-import { calculatePurchaseWeight, calculatePurchaseAmount } from "@/lib/calculations/purchasing";
+import {
+  calculatePurchaseWeight,
+  calculatePurchaseAmount,
+  calculateDeductionAmount,
+  calculateDeductionQuantity,
+  splitDeductions,
+} from "@/lib/calculations/purchasing";
 import { use, useEffect, useMemo, useRef, useState } from "react";
 import { Plus, Trash2, Lock, FileText } from "lucide-react";
 import { getCompanySettings } from "@/actions/settings-actions";
@@ -41,6 +47,7 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
       warehouseId: "",
       grossWeight: 0,
       tareWeight: 0,
+      sackCount: 0,
       policeNumber: "",
       poNumber: "",
       entryTime: "",
@@ -49,7 +56,7 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
       refactionPercent: 0,
       pricePerKg: 0,
       notes: "",
-      deductions: [] as { deductionTypeId: number; name: string; calculationType: string; quantity: number; rate: number; amount: number }[],
+      deductions: [] as { deductionTypeId: number; name: string; calculationType: string; impactType: string; quantity: number; rate: number; amount: number }[],
     },
   });
 
@@ -59,6 +66,15 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: dedTypes } = useQuery({ queryKey: ["deductionTypes"], queryFn: getDeductionTypes });
+  const applicableTypes = useMemo(
+    () =>
+      (dedTypes ?? []).filter(
+        (d) =>
+          d.appliesTo === "BOTH" ||
+          d.appliesTo === (purchase?.purchaseType === "FINISHED_GOOD" ? "FINISHED_GOOD" : "RAW_MATERIAL")
+      ),
+    [dedTypes, purchase?.purchaseType]
+  );
   const { data: company } = useQuery({ queryKey: ["companySettings"], queryFn: getCompanySettings });
 
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -78,6 +94,7 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
       warehouseId: String(purchase.warehouseId),
       grossWeight: Number(purchase.grossWeight),
       tareWeight: Number(purchase.tareWeight),
+      sackCount: Number(purchase.sackCount ?? 0),
       policeNumber: purchase.policeNumber ?? "",
       poNumber: purchase.poNumber ?? "",
       entryTime: purchase.entryTime ?? "",
@@ -90,6 +107,7 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
         deductionTypeId: d.deductionTypeId,
         name: d.name,
         calculationType: d.calculationType,
+        impactType: d.impactType,
         quantity: Number(d.quantity),
         rate: Number(d.rate),
         amount: Number(d.amount),
@@ -102,16 +120,47 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
   const tareWeight = Number(watch("tareWeight")) || 0;
   const refactionPercent = Number(watch("refactionPercent")) || 0;
   const pricePerKg = Number(watch("pricePerKg")) || 0;
-  const watchedDeductions = useMemo(() => watch("deductions") || [], [watch]);
+  const sackCount = Number(watch("sackCount")) || 0;
+  const watchedDeductions = useWatch({ control, name: "deductions" }) ?? [];
 
   const calc = useMemo(() => {
     const w = calculatePurchaseWeight(grossWeight, tareWeight, refactionPercent);
-    const totalDeductions = watchedDeductions.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
-    const a = calculatePurchaseAmount(w.payableWeight, pricePerKg, totalDeductions);
-    return { ...w, ...a, totalDeductions };
+    const { deductions: totalDeductions, costs: totalCosts } = splitDeductions(watchedDeductions);
+    const a = calculatePurchaseAmount(w.payableWeight, pricePerKg, totalDeductions, totalCosts);
+    return { ...w, ...a, totalDeductions, totalCosts };
   }, [grossWeight, tareWeight, refactionPercent, pricePerKg, watchedDeductions]);
 
   const isPosted = purchase && purchase.status !== "Draft";
+
+  const deductionHint = (d?: { calculationType?: string; quantity?: number | string; rate?: number | string }) => {
+    if (!d) return "";
+    const qty = Number(d.quantity) || 0;
+    const rate = Number(d.rate) || 0;
+    if (d.calculationType === "per_sack")
+      return `${qty.toLocaleString("id-ID")} sak × Rp ${rate.toLocaleString("id-ID")}`;
+    if (d.calculationType === "per_kg")
+      return `${qty.toLocaleString("id-ID")} Kg × Rp ${rate.toLocaleString("id-ID")}`;
+    if (d.calculationType === "percentage")
+      return `${rate.toLocaleString("id-ID")}% × Rp ${calc.baseAmount.toLocaleString("id-ID")}`;
+    return "Nominal tetap";
+  };
+
+  const recomputeRow = (index: number, calculationType: string, rate: number) => {
+    const qty = calculateDeductionQuantity({
+      calculationType,
+      payableWeight: calc.payableWeight,
+      sackCount,
+    });
+    const amount = calculateDeductionAmount({
+      calculationType,
+      rate,
+      payableWeight: calc.payableWeight,
+      baseAmount: calc.baseAmount,
+      sackCount,
+    });
+    setValue(`deductions.${index}.quantity`, Math.round(qty * 100) / 100);
+    setValue(`deductions.${index}.amount`, Math.round(amount));
+  };
 
   const watchedNumber = watch("number");
   const watchedDate = watch("date");
@@ -144,6 +193,15 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
       netWeight: calc.netWeight,
       refactionWeight: calc.refactionWeight,
       payableWeight: calc.payableWeight,
+      sackCount,
+      deductions: watchedDeductions.map((d) => ({
+        name: d.name,
+        calculationType: d.calculationType,
+        impactType: d.impactType,
+        quantity: Number(d.quantity) || 0,
+        rate: Number(d.rate) || 0,
+        amount: Number(d.amount) || 0,
+      })),
       pricePerKg,
       baseAmount: calc.baseAmount,
       policeNumber: watchedPoliceNumber || undefined,
@@ -164,6 +222,8 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
     grossWeight,
     tareWeight,
     calc,
+    sackCount,
+    watchedDeductions,
     pricePerKg,
     watchedPoliceNumber,
     watchedPoNumber,
@@ -172,6 +232,42 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
     watchedExitTime,
     company,
   ]);
+
+  const appendDeductionRow = (dt: {
+    id: number;
+    name: string;
+    calculationType: string;
+    impactType: string;
+    defaultValue: string | null;
+  }) => {
+    const rate = Number(dt.defaultValue) || 0;
+    const calculationType = dt.calculationType;
+    const qty = calculateDeductionQuantity({ calculationType, payableWeight: calc.payableWeight, sackCount });
+    const amount = calculateDeductionAmount({
+      calculationType,
+      rate,
+      payableWeight: calc.payableWeight,
+      baseAmount: calc.baseAmount,
+      sackCount,
+    });
+    append({
+      deductionTypeId: dt.id,
+      name: dt.name,
+      calculationType,
+      impactType: dt.impactType,
+      quantity: Math.round(qty * 100) / 100,
+      rate,
+      amount: Math.round(amount),
+    });
+  };
+
+  const addDeduction = () => {
+    if (!applicableTypes || applicableTypes.length === 0) {
+      toast.error("Belum ada jenis potongan aktif untuk transaksi ini. Atur di Master → Jenis Potongan.");
+      return;
+    }
+    appendDeductionRow(applicableTypes[0]);
+  };
 
   const onSubmit = async (data: any) => {
     if (isPosted) {
@@ -194,11 +290,13 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
         exitTime: data.exitTime || undefined,
         refactionPercent: Number(data.refactionPercent),
         pricePerKg: Number(data.pricePerKg),
+        sackCount: Number(data.sackCount),
         notes: data.notes,
         deductions: data.deductions.map((d: any) => ({
           deductionTypeId: Number(d.deductionTypeId),
           name: d.name,
           calculationType: d.calculationType,
+          impactType: d.impactType,
           quantity: Number(d.quantity),
           rate: Number(d.rate),
           amount: Number(d.amount),
@@ -322,6 +420,26 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
                 <Input readOnly value={calc.payableWeight.toLocaleString("id-ID")} className="bg-muted font-mono font-bold" />
               </div>
               <div>
+                <Label>Jumlah Sak</Label>
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  placeholder="Contoh: 37"
+                  {...register("sackCount", {
+                    onChange: (e) => {
+                      const sc = Number(e.target.value) || 0;
+                      watchedDeductions.forEach((d, i) => {
+                        if (d?.calculationType !== "per_sack") return;
+                        const rate = Number(d.rate) || 0;
+                        setValue(`deductions.${i}.quantity`, sc);
+                        setValue(`deductions.${i}.amount`, Math.round(sc * rate));
+                      });
+                    },
+                  })}
+                />
+              </div>
+              <div>
                 <Label>Harga / Kg (Rp)</Label>
                 <Input type="number" step="0.01" {...register("pricePerKg")} />
               </div>
@@ -333,90 +451,106 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
 
             <Separator />
             <div>
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Potongan Lain / Biaya</p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    if (!dedTypes || dedTypes.length === 0) return;
-                    const dt = dedTypes[0];
-                    const rate = Number(dt.defaultValue) || 0;
-                    const qty = dt.calculationType === "per_kg" ? calc.payableWeight : 1;
-                    const amt = dt.calculationType === "per_kg"
-                      ? calc.payableWeight * rate
-                      : dt.calculationType === "percentage"
-                        ? (calc.baseAmount * rate) / 100
-                        : rate;
-                    append({
-                      deductionTypeId: dt.id,
-                      name: dt.name,
-                      calculationType: dt.calculationType,
-                      quantity: qty,
-                      rate,
-                      amount: Math.round(amt),
-                    });
-                  }}
-                >
+                <Button type="button" variant="outline" size="sm" onClick={addDeduction}>
                   <Plus className="mr-2 h-4 w-4" /> Tambah Potongan
                 </Button>
               </div>
 
               <div className="space-y-3">
                 {fields.map((field, index) => (
-                  <div key={field.id} className="flex flex-wrap items-center gap-2 rounded-lg border bg-muted/20 p-3">
-                    <select
-                      className={selectClass + " min-w-[160px] flex-1"}
-                      {...register(`deductions.${index}.deductionTypeId`, {
-                        onChange: (e) => {
-                          const selected = dedTypes?.find((d) => String(d.id) === e.target.value);
-                          if (!selected) return;
-                          const rate = Number(selected.defaultValue) || 0;
-                          const amt = selected.calculationType === "per_kg"
-                            ? calc.payableWeight * rate
-                            : selected.calculationType === "percentage"
-                              ? (calc.baseAmount * rate) / 100
-                              : rate;
-                          setValue(`deductions.${index}.name`, selected.name);
-                          setValue(`deductions.${index}.calculationType`, selected.calculationType);
-                          setValue(`deductions.${index}.quantity`, selected.calculationType === "per_kg" ? calc.payableWeight : 1);
-                          setValue(`deductions.${index}.rate`, rate);
-                          setValue(`deductions.${index}.amount`, Math.round(amt));
-                        },
-                      })}
-                    >
-                      {dedTypes?.map((dt) => (
-                        <option key={dt.id} value={dt.id}>{dt.name} ({dt.calculationType})</option>
-                      ))}
-                    </select>
-                    <Input
-                      type="number"
-                      placeholder="Rate"
-                      className="w-28"
-                      {...register(`deductions.${index}.rate`, {
-                        onChange: (e) => {
-                          const rate = Number(e.target.value) || 0;
-                          const type = watchedDeductions[index]?.calculationType;
-                          const amt = type === "per_kg"
-                            ? calc.payableWeight * rate
-                            : type === "percentage"
-                              ? (calc.baseAmount * rate) / 100
-                              : rate;
-                          setValue(`deductions.${index}.amount`, Math.round(amt));
-                        },
-                      })}
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Jumlah"
-                      className="w-32 bg-muted font-mono"
-                      readOnly
-                      {...register(`deductions.${index}.amount`)}
-                    />
-                    <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => remove(index)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <div key={field.id} className="space-y-2 rounded-lg border bg-muted/20 p-3">
+                    <div className="flex flex-wrap items-end gap-2">
+                      <div className="min-w-[170px] flex-1">
+                        <Label className="text-xs">Jenis Potongan</Label>
+                        <select
+                          className={selectClass}
+                          {...register(`deductions.${index}.deductionTypeId`, {
+                            onChange: (e) => {
+                              const selected = applicableTypes.find((d) => String(d.id) === e.target.value);
+                              if (!selected) return;
+                              const rate = Number(selected.defaultValue) || 0;
+                              setValue(`deductions.${index}.name`, selected.name);
+                              setValue(`deductions.${index}.calculationType`, selected.calculationType);
+                              setValue(`deductions.${index}.impactType`, selected.impactType);
+                              setValue(`deductions.${index}.rate`, rate);
+                              recomputeRow(index, selected.calculationType, rate);
+                            },
+                          })}
+                        >
+                          {(() => {
+                            const rowTypeId = Number(watchedDeductions[index]?.deductionTypeId);
+                            const base = applicableTypes.some((d) => d.id === rowTypeId)
+                              ? applicableTypes
+                              : [
+                                  ...applicableTypes,
+                                  ...(dedTypes ?? []).filter((d) => d.id === rowTypeId),
+                                ];
+                            return base.map((dt) => (
+                              <option key={dt.id} value={dt.id}>
+                                {dt.name} — {dt.calculationType === "per_sack" ? "per sak" : dt.calculationType === "per_kg" ? "per Kg" : dt.calculationType === "percentage" ? "%" : "tetap"}
+                              </option>
+                            ));
+                          })()}
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="text-xs">Tarif (Rp)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="Rate"
+                          className="w-28"
+                          {...register(`deductions.${index}.rate`, {
+                            onChange: (e) => {
+                              recomputeRow(index, watchedDeductions[index]?.calculationType ?? "fixed", Number(e.target.value) || 0);
+                            },
+                          })}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">
+                          {watchedDeductions[index]?.calculationType === "per_sack"
+                            ? "Jml Sak"
+                            : watchedDeductions[index]?.calculationType === "per_kg"
+                              ? "Kg"
+                              : "Qty"}
+                        </Label>
+                        <Input
+                          type="number"
+                          className="w-24 bg-muted font-mono"
+                          readOnly
+                          {...register(`deductions.${index}.quantity`)}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs">Jumlah (Rp)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="w-32 font-mono"
+                          {...register(`deductions.${index}.amount`, { valueAsNumber: true })}
+                        />
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => remove(index)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="flex flex-wrap items-center gap-2 pl-1 text-xs text-muted-foreground">
+                      <span
+                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          watchedDeductions[index]?.impactType === "PURCHASE_COST"
+                            ? "bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400"
+                            : "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400"
+                        }`}
+                      >
+                        {watchedDeductions[index]?.impactType === "PURCHASE_COST" ? "Biaya (+)" : "Potongan (−)"}
+                      </span>
+                      <span>
+                        Hitungan: {deductionHint(watchedDeductions[index])} = Rp {(Number(watchedDeductions[index]?.amount) || 0).toLocaleString("id-ID")}
+                      </span>
+                    </p>
                   </div>
                 ))}
                 {fields.length === 0 && (
@@ -425,14 +559,24 @@ export default function EditPurchasePage({ params }: { params: Promise<{ id: str
               </div>
 
               {fields.length > 0 && (
-                <div className="mt-3 text-right text-sm">
-                  Total Potongan: <span className="font-mono font-bold">Rp {calc.totalDeductions.toLocaleString("id-ID")}</span>
+                <div className="mt-3 space-y-1 text-right text-sm">
+                  <div>
+                    Total Potongan: <span className="font-mono font-bold">Rp {calc.totalDeductions.toLocaleString("id-ID")}</span>
+                  </div>
+                  {calc.totalCosts > 0 && (
+                    <div>
+                      Total Biaya:{" "}
+                      <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
+                        + Rp {calc.totalCosts.toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
             <div className="flex items-center justify-between rounded-xl border bg-primary/5 p-4">
-              <span className="font-semibold">Total Pembayaran Supplier:</span>
+              <span className="font-semibold">Total Pembayaran:</span>
               <span className="font-mono text-xl font-bold text-accent">Rp {calc.netAmount.toLocaleString("id-ID")}</span>
             </div>
 

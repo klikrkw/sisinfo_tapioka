@@ -19,8 +19,10 @@ export default function AddDriverPage() {
       title="Tambah Sopir"
       fields={fields}
       defaultValues={{ code: "", name: "" }}
-      submit={async (data) => await createDriver(data as any)}
-      backHref="/master/fleet"
+      submit={async (data) => {
+        await createDriver(data as any);
+      }}
+      backHref="/master/fleet/drivers"
     />
   );
 }

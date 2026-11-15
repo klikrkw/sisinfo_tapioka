@@ -23,6 +23,8 @@ export type PurchaseReceiptData = {
   payableWeight: number;
   pricePerKg: number;
   baseAmount: number;
+  sackCount?: number;
+  deductions?: { name: string; calculationType: string; impactType?: string; quantity: number; rate: number; amount: number }[];
   policeNumber?: string;
   poNumber?: string;
   entryTime?: string;
@@ -168,11 +170,68 @@ async function buildReceiptPdf(data: PurchaseReceiptData) {
   doc.text(`Rp ${fmt(data.baseAmount)}`, RIGHT, y, { align: "right" });
   y += 5;
 
+  const deductions = data.deductions ?? [];
+  const totalDeductions = deductions
+    .filter((d) => d.impactType !== "PURCHASE_COST")
+    .reduce((acc, d) => acc + Number(d.amount || 0), 0);
+  const totalCosts = deductions
+    .filter((d) => d.impactType === "PURCHASE_COST")
+    .reduce((acc, d) => acc + Number(d.amount || 0), 0);
+
+  if (deductions.length > 0) {
+    doc.setFontSize(8);
+    doc.setTextColor(110);
+    doc.text(
+      `POTONGAN & BIAYA${data.sackCount ? ` (${fmt(data.sackCount)} SAK)` : ""}`,
+      MM,
+      y
+    );
+    doc.setTextColor(0);
+    y += 4.5;
+
+    deductions.forEach((d) => {
+      if (y > 185) {
+        doc.addPage();
+        y = 20;
+      }
+      const qty = Number(d.quantity) || 0;
+      const rate = Number(d.rate) || 0;
+      const qtyLabel =
+        d.calculationType === "per_sack"
+          ? `${fmt(qty)} sak`
+          : d.calculationType === "per_kg"
+            ? `${fmt(qty)} kg`
+            : d.calculationType === "percentage"
+              ? `${fmt(rate)}%`
+              : "";
+      const label = qtyLabel ? `${d.name} (${qtyLabel} x ${fmt(rate)})` : d.name;
+      const isCost = d.impactType === "PURCHASE_COST";
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.text(truncate(label, RIGHT - MM - 30), MM, y);
+      doc.text(`${isCost ? "+" : "-"} Rp ${fmt(d.amount)}`, RIGHT, y, { align: "right" });
+      y += 4.5;
+    });
+
+    y += 0.5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.text("Total Potongan", MM, y);
+    doc.text(`- Rp ${fmt(totalDeductions)}`, RIGHT, y, { align: "right" });
+    y += 4.5;
+    if (totalCosts > 0) {
+      doc.text("Total Biaya", MM, y);
+      doc.text(`+ Rp ${fmt(totalCosts)}`, RIGHT, y, { align: "right" });
+      y += 4.5;
+    }
+    y += 0.5;
+  }
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   doc.text("TOTAL", MM, y);
   doc.text(":", colonX, y);
-  doc.text(`Rp ${fmt(data.baseAmount)}`, RIGHT, y, { align: "right" });
+  doc.text(`Rp ${fmt(data.baseAmount - totalDeductions + totalCosts)}`, RIGHT, y, { align: "right" });
 
   // Footer
   doc.setFont("helvetica", "normal");

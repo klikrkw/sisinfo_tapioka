@@ -90,8 +90,9 @@ export async function getDriverById(id: number) {
 }
 
 export async function createDriver(data: typeof drivers.$inferInsert) {
-  await db.insert(drivers).values(data);
+  const [res] = await db.insert(drivers).values(data);
   revalidatePath("/master/fleet");
+  return Number(res.insertId);
 }
 
 export async function updateDriver(id: number, data: Partial<typeof drivers.$inferInsert>) {

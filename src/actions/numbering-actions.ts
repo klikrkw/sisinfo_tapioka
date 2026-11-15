@@ -6,8 +6,10 @@ import { eq, sql } from "drizzle-orm";
 
 const DEFAULT_PATTERNS: Record<string, { prefix: string; pattern: string; table: string }> = {
   PURCHASE: { prefix: "PB", pattern: "PB/{YYYY}/{MM}/{000001}", table: "purchases" },
+  PURCHASE_FINISHED: { prefix: "PBF", pattern: "PBF/{YYYY}/{MM}/{000001}", table: "purchases" },
   PRODUCTION: { prefix: "PRD", pattern: "PRD/{YYYY}/{MM}/{000001}", table: "production_batches" },
   SALES: { prefix: "PJ", pattern: "PJ/{YYYY}/{MM}/{000001}", table: "sales" },
+  DELIVERY_NOTE: { prefix: "SJ", pattern: "SJ/{YYYY}/{MM}/{000001}", table: "sales" },
   SHIPMENT: { prefix: "DO", pattern: "DO/{YYYY}/{MM}/{000001}", table: "shipments" },
   PAYMENT: { prefix: "PAY", pattern: "PAY/{YYYY}/{MM}/{000001}", table: "cash_transactions" },
 };

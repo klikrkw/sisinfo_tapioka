@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { use } from "react";
 import { useRouter } from "next/navigation";
+import { Truck } from "lucide-react";
 
 export default function ShipmentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -34,6 +35,11 @@ export default function ShipmentDetailPage({ params }: { params: Promise<{ id: s
         </div>
         <div className="flex items-center gap-2">
           <Badge>{s.status}</Badge>
+          {s.saleId && (
+            <Button variant="outline" size="sm" onClick={() => router.push(`/sales/${s.saleId}/surat-jalan`)}>
+              <Truck className="mr-2 h-4 w-4" /> Surat Jalan
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={() => router.push("/fleet")}>Kembali</Button>
         </div>
       </div>

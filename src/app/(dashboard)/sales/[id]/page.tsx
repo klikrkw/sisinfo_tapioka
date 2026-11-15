@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Printer, Leaf } from "lucide-react";
+import { Printer, Leaf, Truck } from "lucide-react";
 
 function formatRp(n: number) {
   return "Rp " + n.toLocaleString("id-ID");
@@ -62,11 +62,15 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
             <h2 className="text-2xl font-bold tracking-tight">Penjualan {sale.number}</h2>
             <p className="text-sm text-muted-foreground">
               {new Date(sale.date).toLocaleDateString("id-ID")} · {sale.paymentMethod}
+              {sale.deliveryNoteNumber ? ` · Surat Jalan ${sale.deliveryNoteNumber}` : ""}
               {sale.dueDate ? ` · Jatuh tempo ${new Date(sale.dueDate).toLocaleDateString("id-ID")}` : ""}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Badge>{sale.status}</Badge>
+            <Button variant="outline" size="sm" onClick={() => router.push(`/sales/${saleId}/surat-jalan`)}>
+              <Truck className="mr-2 h-4 w-4" /> Surat Jalan
+            </Button>
             <Button size="sm" onClick={() => window.print()}>
               <Printer className="mr-2 h-4 w-4" /> Cetak Invoice
             </Button>

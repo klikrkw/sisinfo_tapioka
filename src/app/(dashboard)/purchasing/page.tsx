@@ -3,6 +3,7 @@
 import { MasterList, type Column } from "@/components/master/master-list";
 import { getPurchasesPaginated } from "@/actions/purchasing-actions";
 import { Badge } from "@/components/ui/badge";
+import { PurchaseTabs } from "@/components/purchasing/purchase-tabs";
 
 type Purchase = {
   id: number;
@@ -10,6 +11,9 @@ type Purchase = {
   date: Date;
   grossWeight: string;
   payableWeight: string;
+  sackCount: string | null;
+  totalDeductions: string | null;
+  totalCosts: string | null;
   netAmount: string;
   status: string | null;
 };
@@ -27,6 +31,23 @@ const columns: Column<Purchase>[] = [
   { header: "Tanggal", cell: (r) => new Date(r.date).toLocaleDateString("id-ID") },
   { header: "Bruto", cell: (r) => `${Number(r.grossWeight || 0).toLocaleString("id-ID")} Kg` },
   { header: "Berat Dibayar", cell: (r) => `${Number(r.payableWeight || 0).toLocaleString("id-ID")} Kg` },
+  { header: "Sak", cell: (r) => <span className="font-mono">{Number(r.sackCount || 0).toLocaleString("id-ID")}</span> },
+  {
+    header: "Potongan / Biaya",
+    cell: (r) => (
+      <div className="font-mono text-xs">
+        {Number(r.totalDeductions || 0) > 0 && (
+          <div className="text-emerald-600 dark:text-emerald-400">− Rp {Number(r.totalDeductions).toLocaleString("id-ID")}</div>
+        )}
+        {Number(r.totalCosts || 0) > 0 && (
+          <div className="text-amber-600 dark:text-amber-400">+ Rp {Number(r.totalCosts).toLocaleString("id-ID")}</div>
+        )}
+        {Number(r.totalDeductions || 0) === 0 && Number(r.totalCosts || 0) === 0 && (
+          <span className="text-muted-foreground">Rp 0</span>
+        )}
+      </div>
+    ),
+  },
   { header: "Nilai", cell: (r) => <span className="font-mono">Rp {Number(r.netAmount || 0).toLocaleString("id-ID")}</span> },
   {
     header: "Status",
@@ -40,14 +61,17 @@ const columns: Column<Purchase>[] = [
 
 export default function PurchasingPage() {
   return (
-    <MasterList<Purchase>
-      title="Transaksi Pembelian Ketela"
-      queryKey="purchases"
-      queryFn={getPurchasesPaginated}
-      columns={columns}
-      addHref="/purchasing/add"
-      addLabel="Tambah Pembelian"
-      searchPlaceholder="Cari nomor pembelian..."
-    />
+    <div className="space-y-4">
+      <PurchaseTabs />
+      <MasterList<Purchase>
+        title="Transaksi Pembelian Ketela"
+        queryKey="purchases"
+        queryFn={getPurchasesPaginated}
+        columns={columns}
+        addHref="/purchasing/add"
+        addLabel="Tambah Pembelian"
+        searchPlaceholder="Cari nomor pembelian..."
+      />
+    </div>
   );
 }
