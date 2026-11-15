@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
 import {
-  calculatePurchaseWeight,
+  calculatePurchaseWeightFromSackRefaction,
   calculatePurchaseAmount,
   calculateDeductionAmount,
   calculateDeductionQuantity,
@@ -47,12 +47,12 @@ export default function AddFinishedPurchasePage() {
       grossWeight: 0,
       tareWeight: 0,
       sackCount: 0,
+      refactionPerSack: 0,
       policeNumber: "",
       poNumber: "",
       entryTime: "",
       exitDate: "",
       exitTime: "",
-      refactionPercent: 0,
       pricePerKg: 0,
       notes: "",
       deductions: [] as DeductionRow[],
@@ -90,17 +90,17 @@ export default function AddFinishedPurchasePage() {
 
   const grossWeight = Number(watch("grossWeight")) || 0;
   const tareWeight = Number(watch("tareWeight")) || 0;
-  const refactionPercent = Number(watch("refactionPercent")) || 0;
-  const pricePerKg = Number(watch("pricePerKg")) || 0;
   const sackCount = Number(watch("sackCount")) || 0;
+  const refactionPerSack = Number(watch("refactionPerSack")) || 0;
+  const pricePerKg = Number(watch("pricePerKg")) || 0;
   const watchedDeductions = useWatch({ control, name: "deductions" }) ?? [];
 
   const calc = useMemo(() => {
-    const w = calculatePurchaseWeight(grossWeight, tareWeight, refactionPercent);
+    const w = calculatePurchaseWeightFromSackRefaction(grossWeight, tareWeight, sackCount, refactionPerSack);
     const { deductions: totalDeductions, costs: totalCosts } = splitDeductions(watchedDeductions);
     const a = calculatePurchaseAmount(w.payableWeight, pricePerKg, totalDeductions, totalCosts);
     return { ...w, ...a, totalDeductions, totalCosts };
-  }, [grossWeight, tareWeight, refactionPercent, pricePerKg, watchedDeductions]);
+  }, [grossWeight, tareWeight, sackCount, refactionPerSack, pricePerKg, watchedDeductions]);
 
   useEffect(() => {
     watchedDeductions.forEach((d, i) => {
@@ -175,7 +175,8 @@ export default function AddFinishedPurchasePage() {
         entryTime: data.entryTime || undefined,
         exitDate: data.exitDate || undefined,
         exitTime: data.exitTime || undefined,
-        refactionPercent: Number(data.refactionPercent),
+        refactionPercent: Math.round(calc.refactionPercent * 100) / 100,
+        refactionWeight: Math.round(calc.refactionWeight * 100) / 100,
         pricePerKg: Number(data.pricePerKg),
         deductions: data.deductions.map((d: any) => ({
           deductionTypeId: Number(d.deductionTypeId),
@@ -197,7 +198,7 @@ export default function AddFinishedPurchasePage() {
   const fillExample = () => {
     setValue("grossWeight", 3476);
     setValue("tareWeight", 0);
-    setValue("refactionPercent", 0);
+    setValue("refactionPerSack", 0);
     setValue("sackCount", 37);
     setValue("pricePerKg", 14400);
     const picks = applicableTypes.filter((d) => d.code === "DED-002" || d.code === "DED-003");
@@ -445,25 +446,46 @@ export default function AddFinishedPurchasePage() {
                 <Input readOnly value={calc.netWeight.toLocaleString("id-ID")} className="bg-muted font-mono font-semibold" />
               </div>
               <div>
-                <Label>Rifaksi (%)</Label>
-                <Input type="number" step="0.01" {...register("refactionPercent")} />
-              </div>
-              <div>
-                <Label>Rifaksi (Kg)</Label>
-                <Input readOnly value={calc.refactionWeight.toLocaleString("id-ID")} className="bg-muted font-mono" />
-              </div>
-              <div>
-                <Label>Berat Dibayar (Kg)</Label>
-                <Input readOnly value={calc.payableWeight.toLocaleString("id-ID")} className="bg-muted font-bold font-mono" />
-              </div>
-              <div>
                 <Label className="flex items-center gap-1.5"><Package className="h-3.5 w-3.5" /> Jumlah Sak</Label>
-                <Input type="number" step="1" min="0" placeholder="Contoh: 37" {...register("sackCount")} />
+                <Input type="number" step="1" min="0" placeholder="Contoh: 45" {...register("sackCount")} />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {sackCount > 0
                     ? `≈ ${kgPerSack.toLocaleString("id-ID", { maximumFractionDigits: 2 })} Kg / sak`
                     : "Isi jumlah sak untuk potongan per sak"}
                 </p>
+              </div>
+              <div>
+                <Label>Rifaksi / Sak (Kg)</Label>
+                <Input type="number" step="0.01" min="0" placeholder="Contoh: 2" {...register("refactionPerSack")} />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {sackCount > 0 && refactionPerSack > 0
+                    ? `Total rifaksi = ${sackCount.toLocaleString("id-ID")} sak × ${refactionPerSack.toLocaleString("id-ID", { maximumFractionDigits: 2 })} Kg`
+                    : "Rifaksi dihitung dari jumlah sak"}
+                </p>
+              </div>
+              <div>
+                <Label>Total Rifaksi (Kg)</Label>
+                <Input readOnly value={calc.refactionWeight.toLocaleString("id-ID", { maximumFractionDigits: 2 })} className="bg-muted font-mono" />
+                <p className="mt-1 text-xs text-muted-foreground">Otomatis: jumlah sak × rifaksi / sak</p>
+              </div>
+              <div>
+                <Label>Rifaksi (%)</Label>
+                <Input
+                  readOnly
+                  value={calc.refactionPercent.toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                  className="bg-muted font-mono"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {calc.netWeight > 0
+                    ? calc.refactionWeight > calc.netWeight
+                      ? "Total rifaksi melebihi berat netto"
+                      : `= ${calc.refactionWeight.toLocaleString("id-ID", { maximumFractionDigits: 2 })} ÷ ${calc.netWeight.toLocaleString("id-ID")} × 100`
+                    : "Otomatis: total rifaksi ÷ netto × 100"}
+                </p>
+              </div>
+              <div>
+                <Label>Berat Dibayar (Kg)</Label>
+                <Input readOnly value={calc.payableWeight.toLocaleString("id-ID")} className="bg-muted font-bold font-mono" />
               </div>
               <div>
                 <Label>Harga / Kg (Rp)</Label>
@@ -611,6 +633,23 @@ export default function AddFinishedPurchasePage() {
               <span className="text-muted-foreground">Berat bersih</span>
               <span className="font-mono font-semibold">{calc.netWeight.toLocaleString("id-ID")} Kg</span>
             </div>
+            {calc.refactionWeight > 0 && (
+              <>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Rifaksi</span>
+                  <span className="font-mono">
+                    {sackCount.toLocaleString("id-ID")} sak × {refactionPerSack.toLocaleString("id-ID", { maximumFractionDigits: 2 })} Kg
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Total rifaksi</span>
+                  <span className="font-mono">
+                    {calc.refactionWeight.toLocaleString("id-ID", { maximumFractionDigits: 2 })} Kg ·{" "}
+                    {calc.refactionPercent.toLocaleString("id-ID", { maximumFractionDigits: 2 })}%
+                  </span>
+                </div>
+              </>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Berat dibayar</span>
               <span className="font-mono font-semibold">{calc.payableWeight.toLocaleString("id-ID")} Kg</span>
@@ -693,7 +732,10 @@ export default function AddFinishedPurchasePage() {
             <p className="flex items-center gap-1.5 font-semibold text-foreground">
               <Percent className="h-3.5 w-3.5" /> Contoh perhitungan
             </p>
-            <p>Berat bersih 3.476 Kg × Rp 14.400 = Rp 50.054.400</p>
+            <p>Berat bersih 4.500 Kg × Rp 14.400 = Rp 64.800.000</p>
+            <p>Total rifaksi = 45 sak × 2 Kg = 90 Kg</p>
+            <p>Rifaksi (%) = 90 ÷ 4.500 × 100 = 2%</p>
+            <p>Berat dibayar = 4.500 − 90 = 4.410 Kg</p>
             <p>Potongan sak: jumlah sak × Rp 4.000</p>
             <p>Manol Fee: jumlah sak × Rp 7.500</p>
             <p className="text-[11px]">

@@ -7,13 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Database, Download, Upload, AlertTriangle, RefreshCw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { backupDatabase, restoreDatabase, resetDatabase } from "@/actions/backup-actions";
+import { useQuery } from "@tanstack/react-query";
+import { backupDatabase, restoreDatabase, resetDatabase, getDatabaseInfo } from "@/actions/backup-actions";
 
 export default function BackupPage() {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const { data: dbInfo } = useQuery({ queryKey: ["db-info"], queryFn: getDatabaseInfo });
 
   const handleBackup = async () => {
     setIsBackingUp(true);
@@ -96,6 +98,11 @@ export default function BackupPage() {
         <p className="text-sm text-muted-foreground">
           Kelola cadangan data sistem dan lakukan pemulihan data database bila diperlukan.
         </p>
+        {dbInfo && (
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            Target: {dbInfo.user}@{dbInfo.host}:{dbInfo.port}/{dbInfo.database} · restore via koneksi aplikasi
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2">

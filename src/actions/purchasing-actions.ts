@@ -3,7 +3,12 @@
 import { db } from "@/db";
 import { purchases, stockMovements, purchaseDeductions, payablePayments, cashTransactions, products } from "@/db/schema";
 import { eq, and, or, like, desc } from "drizzle-orm";
-import { calculatePurchaseWeight, calculatePurchaseAmount, splitDeductions } from "@/lib/calculations/purchasing";
+import {
+  calculatePurchaseWeight,
+  calculatePurchaseWeightFromRefaction,
+  calculatePurchaseAmount,
+  splitDeductions,
+} from "@/lib/calculations/purchasing";
 import { revalidatePath } from "next/cache";
 
 export async function getPurchasesPaginated(page: number, limit: number, search?: string) {
@@ -232,16 +237,18 @@ export async function createPurchaseTransaction(formData: {
   exitDate?: string;
   exitTime?: string;
   refactionPercent: number;
+  /** Bila diisi, rifaksi (Kg) dijadikan acuan dan persentase diturunkan otomatis. */
+  refactionWeight?: number;
   sackCount?: number;
   pricePerKg: number;
   notes?: string;
   deductions?: { deductionTypeId: number; name: string; calculationType: string; impactType?: string; quantity: number; rate: number; amount: number }[];
 }) {
-  const { netWeight, refactionWeight, payableWeight } = calculatePurchaseWeight(
-    formData.grossWeight,
-    formData.tareWeight,
-    formData.refactionPercent
-  );
+  const baseWeight = calculatePurchaseWeight(formData.grossWeight, formData.tareWeight, formData.refactionPercent);
+  const { netWeight, refactionWeight, refactionPercent, payableWeight } =
+    formData.refactionWeight !== undefined && formData.refactionWeight !== null
+      ? calculatePurchaseWeightFromRefaction(formData.grossWeight, formData.tareWeight, formData.refactionWeight)
+      : { ...baseWeight, refactionPercent: formData.refactionPercent };
 
   const { deductions: totalDeductions, costs: totalCosts } = splitDeductions(formData.deductions ?? []);
   const { baseAmount, netAmount } = calculatePurchaseAmount(
@@ -267,7 +274,7 @@ export async function createPurchaseTransaction(formData: {
       exitDate: formData.exitDate ? new Date(formData.exitDate) : null,
       exitTime: formData.exitTime || null,
       netWeight: String(netWeight),
-      refactionPercent: String(formData.refactionPercent),
+      refactionPercent: String(Math.round(refactionPercent * 100) / 100),
       refactionWeight: String(refactionWeight),
       payableWeight: String(payableWeight),
       sackCount: String(formData.sackCount ?? 0),

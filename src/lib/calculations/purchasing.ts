@@ -5,6 +5,49 @@ export function calculatePurchaseWeight(gross: number, tare: number, refactionPe
   return { netWeight, refactionWeight, payableWeight };
 }
 
+/**
+ * Total Rifaksi (Kg) = Jumlah Sak x Rifaksi per Sak (Kg)
+ */
+export function calculateRefactionWeight(sackCount: number, refactionPerSack: number) {
+  return Math.max(sackCount || 0, 0) * Math.max(refactionPerSack || 0, 0);
+}
+
+/**
+ * Rifaksi (%) = Total Rifaksi (Kg) / Total Netto (Kg) x 100
+ */
+export function calculateRefactionPercent(refactionWeight: number, netWeight: number) {
+  if (!netWeight || netWeight <= 0) return 0;
+  return (refactionWeight / netWeight) * 100;
+}
+
+/**
+ * Rifaksi diinput per sak (Kg) lalu dikonversi menjadi total Kg dan persentase.
+ */
+export function calculatePurchaseWeightFromSackRefaction(
+  gross: number,
+  tare: number,
+  sackCount: number,
+  refactionPerSack: number
+) {
+  return calculatePurchaseWeightFromRefaction(
+    gross,
+    tare,
+    calculateRefactionWeight(sackCount, refactionPerSack)
+  );
+}
+
+/**
+ * Kebalikan dari calculatePurchaseWeight: rifaksi diinput dalam Kg,
+ * lalu persentase rifaksi diturunkan otomatis dari berat netto.
+ */
+export function calculatePurchaseWeightFromRefaction(gross: number, tare: number, refactionWeight: number) {
+  const netWeight = Math.max(gross - tare, 0);
+  const weight = Math.min(Math.max(refactionWeight || 0, 0), netWeight);
+  const refactionPercent = calculateRefactionPercent(weight, netWeight);
+  const payableWeight = netWeight - weight;
+  return { netWeight, refactionWeight: weight, refactionPercent, payableWeight };
+}
+
 export function calculatePurchaseAmount(
   payableWeight: number,
   pricePerKg: number,

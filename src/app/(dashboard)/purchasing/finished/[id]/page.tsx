@@ -141,7 +141,23 @@ export default function FinishedPurchaseDetailPage({ params }: { params: Promise
                 <TableCell className="text-muted-foreground">Berat Bersih / Netto</TableCell>
                 <TableCell className="text-right font-mono font-semibold">{Number(purchase.netWeight).toLocaleString("id-ID")} Kg</TableCell>
               </TableRow>
-              <TableRow><TableCell className="text-muted-foreground">Rifaksi</TableCell><TableCell className="text-right font-mono">{Number(purchase.refactionPercent ?? 0).toLocaleString("id-ID")}% ({Number(purchase.refactionWeight ?? 0).toLocaleString("id-ID")} Kg)</TableCell></TableRow>
+              <TableRow>
+                <TableCell className="text-muted-foreground">Rifaksi</TableCell>
+                <TableCell className="text-right font-mono">
+                  {Number(purchase.refactionPercent ?? 0).toLocaleString("id-ID")}% (
+                  {Number(purchase.refactionWeight ?? 0).toLocaleString("id-ID")} Kg
+                  {Number(purchase.sackCount ?? 0) > 0 && (
+                    <>
+                      {" · "}
+                      {(Number(purchase.refactionWeight ?? 0) / Number(purchase.sackCount)).toLocaleString("id-ID", {
+                        maximumFractionDigits: 2,
+                      })}{" "}
+                      Kg/sak
+                    </>
+                  )}
+                  )
+                </TableCell>
+              </TableRow>
               <TableRow><TableCell className="text-muted-foreground">Berat Dibayar</TableCell><TableCell className="text-right font-mono font-semibold">{Number(purchase.payableWeight).toLocaleString("id-ID")} Kg</TableCell></TableRow>
               <TableRow><TableCell className="text-muted-foreground">Jumlah Sak</TableCell><TableCell className="text-right font-mono">{Number(purchase.sackCount ?? 0).toLocaleString("id-ID")} sak</TableCell></TableRow>
               <TableRow><TableCell className="text-muted-foreground">Harga / Kg</TableCell><TableCell className="text-right font-mono">{formatRp(purchase.pricePerKg)}</TableCell></TableRow>
