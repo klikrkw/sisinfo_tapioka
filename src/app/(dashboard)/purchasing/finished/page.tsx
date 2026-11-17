@@ -10,7 +10,6 @@ type FinishedPurchase = {
   date: Date;
   productName: string | null;
   productUnit: string | null;
-  brand: string | null;
   netWeight: string;
   payableWeight: string;
   sackCount: string | null;
@@ -35,12 +34,7 @@ const columns: Column<FinishedPurchase>[] = [
   { header: "Tanggal", cell: (r) => new Date(r.date).toLocaleDateString("id-ID") },
   {
     header: "Produk",
-    cell: (r) => (
-      <div className="font-medium">
-        <span>{r.productName ?? "-"}</span>
-        {r.brand && <span className="ml-1 text-xs text-muted-foreground">— {r.brand}</span>}
-      </div>
-    ),
+    cell: (r) => <span className="font-medium">{r.productName ?? "-"}</span>,
   },
   {
     header: "Berat Bersih",

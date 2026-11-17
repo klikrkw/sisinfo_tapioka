@@ -8,19 +8,34 @@ import { getProducts, getWarehouses } from "@/actions/master-actions";
 import { getStockBalances } from "@/actions/warehouse-actions";
 import { getProductUnitCosts } from "@/actions/costing-actions";
 import { getCustomers } from "@/actions/master-others";
+import { getBrands, createBrand } from "@/actions/brand-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, AlertTriangle, PackageCheck } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { Plus, Trash2, AlertTriangle, PackageCheck, Tag } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+const NEW_BRAND = "__new";
 
 export default function AddSalePage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const [brandDialogIndex, setBrandDialogIndex] = useState<number | null>(null);
+  const [newBrandName, setNewBrandName] = useState("");
+  const [savingBrand, setSavingBrand] = useState(false);
+
   const { register, handleSubmit, watch, control, setValue } = useForm({
     defaultValues: {
       number: "",
@@ -30,7 +45,7 @@ export default function AddSalePage() {
       paymentMethod: "Cash",
       termDays: 0,
       notes: "",
-      items: [] as { productId: string; quantity: number; price: number; discount: number }[],
+      items: [] as { productId: string; brandId: string; quantity: number; weight: number; price: number; discount: number }[],
     },
   });
 
@@ -41,6 +56,7 @@ export default function AddSalePage() {
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: stockBalances } = useQuery({ queryKey: ["stock-balances-all"], queryFn: () => getStockBalances() });
   const { data: hppMap } = useQuery({ queryKey: ["product-unit-costs"], queryFn: getProductUnitCosts });
+  const { data: brands } = useQuery({ queryKey: ["brands"], queryFn: () => getBrands() });
   const { data: sequences } = useQuery({ queryKey: ["documentSequences"], queryFn: getDocumentSequences });
 
   const salesPrefix = useMemo(() => {
@@ -64,7 +80,25 @@ export default function AddSalePage() {
   };
 
   const watchedItems = watch("items") || [];
-  const total = watchedItems.reduce((a, i) => a + (Number(i.quantity) || 0) * (Number(i.price) || 0) - (Number(i.discount) || 0), 0);
+
+  // Dasar hitung harga: jumlah berat (qty x berat/satuan); bila berat belum diisi, pakai qty.
+  const lineQuantity = (i: { quantity?: number; weight?: number }) => {
+    const qty = Number(i.quantity) || 0;
+    const weight = qty * (Number(i.weight) || 0);
+    return weight > 0 ? weight : qty;
+  };
+  const lineTotal = (i: { quantity?: number; weight?: number; price?: number; discount?: number }) =>
+    lineQuantity(i) * (Number(i.price) || 0) - (Number(i.discount) || 0);
+
+  const total = watchedItems.reduce((a, i) => a + lineTotal(i), 0);
+  const totalWeight = watchedItems.reduce(
+    (a, i) => a + (Number(i.quantity) || 0) * (Number(i.weight) || 0),
+    0
+  );
+
+  // Berat dicatat dalam Kg, ditampilkan juga dalam Ton (1 Ton = 1.000 Kg).
+  const fmtKg = (kg: number) => kg.toLocaleString("id-ID", { maximumFractionDigits: 2 });
+  const fmtTon = (kg: number) => (kg / 1000).toLocaleString("id-ID", { maximumFractionDigits: 3 });
 
   const onSubmit = async (data: any) => {
     if (!data.warehouseId) {
@@ -92,7 +126,9 @@ export default function AddSalePage() {
         notes: data.notes,
         items: data.items.map((i: any) => ({
           productId: Number(i.productId),
+          brandId: i.brandId ? Number(i.brandId) : null,
           quantity: Number(i.quantity),
+          weight: i.weight ? Number(i.weight) : null,
           price: Number(i.price),
           discount: Number(i.discount),
         })),
@@ -105,6 +141,23 @@ export default function AddSalePage() {
       router.push("/sales");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Gagal menyimpan penjualan");
+    }
+  };
+
+  const handleSaveBrand = async () => {
+    if (brandDialogIndex === null || !newBrandName.trim()) return;
+    setSavingBrand(true);
+    try {
+      const brand = await createBrand(newBrandName);
+      await queryClient.invalidateQueries({ queryKey: ["brands"] });
+      setValue(`items.${brandDialogIndex}.brandId`, String(brand.id));
+      toast.success(`Merek "${brand.name}" ditambahkan`);
+      setBrandDialogIndex(null);
+      setNewBrandName("");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Gagal menambah merek");
+    } finally {
+      setSavingBrand(false);
     }
   };
 
@@ -147,7 +200,7 @@ export default function AddSalePage() {
           <Separator />
           <div className="flex items-center justify-between">
             <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Item Penjualan</p>
-            <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: "", quantity: 0, price: 0, discount: 0 })}>
+            <Button type="button" variant="outline" size="sm" onClick={() => append({ productId: "", brandId: "", quantity: 0, weight: 0, price: 0, discount: 0 })}>
               <Plus className="mr-2 h-4 w-4" /> Tambah Item
             </Button>
           </div>
@@ -183,12 +236,55 @@ export default function AddSalePage() {
                     );
                   })}
                 </select>
+                <select
+                  className={selectClass + " w-44"}
+                  title="Merek produk untuk laporan penjualan per merek"
+                  {...register(`items.${i}.brandId`, {
+                    onChange: (e) => {
+                      if (e.target.value === NEW_BRAND) {
+                        setBrandDialogIndex(i);
+                        setNewBrandName("");
+                        setValue(`items.${i}.brandId`, "");
+                      }
+                    },
+                  })}
+                >
+                  <option value="">Tanpa merek</option>
+                  {brands?.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                  <option value={NEW_BRAND}>+ Tambah merek baru…</option>
+                </select>
                 <Input type="number" step="0.01" placeholder="Qty" className={`w-24 ${exceeds ? "border-destructive" : ""}`} {...register(`items.${i}.quantity`, { valueAsNumber: true })} />
-                <Input type="number" step="0.01" placeholder="Harga" className={`w-28 ${belowHpp ? "border-destructive" : ""}`} {...register(`items.${i}.price`, { valueAsNumber: true })} />
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Berat/Satuan (Kg)"
+                  title="Berat per satuan, mis. 50 Kg per sak"
+                  className="w-32"
+                  {...register(`items.${i}.weight`, { valueAsNumber: true })}
+                />
+                <Input
+                  readOnly
+                  tabIndex={-1}
+                  placeholder="Jumlah Berat"
+                  title="Otomatis: qty × berat per satuan"
+                  className="w-32 bg-muted font-mono"
+                  value={(
+                    (Number(watchedItems[i]?.quantity) || 0) * (Number(watchedItems[i]?.weight) || 0)
+                  ).toLocaleString("id-ID", { maximumFractionDigits: 2 })}
+                />
+                <Input type="number" step="0.01" placeholder="Harga/Kg" className={`w-28 ${belowHpp ? "border-destructive" : ""}`} {...register(`items.${i}.price`, { valueAsNumber: true })} />
                 <Input type="number" step="0.01" placeholder="Diskon" className="w-24" {...register(`items.${i}.discount`, { valueAsNumber: true })} />
-                <span className="ml-auto whitespace-nowrap rounded-md bg-muted px-2 py-1 text-xs font-mono text-muted-foreground">
-                  {((Number(watchedItems[i]?.quantity) || 0) * (Number(watchedItems[i]?.price) || 0) - (Number(watchedItems[i]?.discount) || 0)).toLocaleString("id-ID")}
-                </span>
+                <div className="ml-auto flex flex-col items-end">
+                  <span className="whitespace-nowrap rounded-md bg-muted px-2 py-1 text-xs font-mono text-muted-foreground">
+                    {lineTotal(watchedItems[i] ?? {}).toLocaleString("id-ID")}
+                  </span>
+                  <span className="mt-0.5 text-[10px] text-muted-foreground">
+                    {lineQuantity(watchedItems[i] ?? {}).toLocaleString("id-ID", { maximumFractionDigits: 2 })} × harga
+                  </span>
+                </div>
                 <Button type="button" variant="ghost" size="icon" className="text-destructive" onClick={() => remove(i)}>
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -207,6 +303,11 @@ export default function AddSalePage() {
                         <AlertTriangle className="h-3.5 w-3.5" /> Stok tidak tersedia di gudang ini (0 {products?.find((p) => p.id === Number(pid))?.unit ?? "Kg"})
                       </span>
                     )}
+                    <span className={Number(watchedItems[i]?.weight) > 0 ? "font-medium text-foreground" : "text-muted-foreground"}>
+                      {Number(watchedItems[i]?.weight) > 0
+                        ? `Jumlah berat: ${fmtKg((Number(watchedItems[i]?.quantity) || 0) * Number(watchedItems[i]?.weight))} Kg ≈ ${fmtTon((Number(watchedItems[i]?.quantity) || 0) * Number(watchedItems[i]?.weight))} Ton (${(Number(watchedItems[i]?.quantity) || 0).toLocaleString("id-ID")} × ${fmtKg(Number(watchedItems[i]?.weight))} Kg)`
+                        : "Berat per satuan belum diisi"}
+                    </span>
                     <span className="text-muted-foreground">
                       {hpp > 0
                         ? `${costInfoFor(pid)?.label}: Rp ${Math.round(hpp).toLocaleString("id-ID")}/Kg`
@@ -237,6 +338,15 @@ export default function AddSalePage() {
             <span className="font-mono text-xl font-bold text-accent">Rp {total.toLocaleString("id-ID")}</span>
           </div>
 
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-muted/30 px-4 py-2 text-sm">
+            <span className="text-muted-foreground">Total Berat:</span>
+            <span className="font-mono font-semibold">
+              {fmtKg(totalWeight)} Kg
+              <span className="text-muted-foreground"> ≈ </span>
+              {fmtTon(totalWeight)} Ton
+            </span>
+          </div>
+
           <div><Label>Keterangan</Label><Input {...register("notes")} /></div>
 
           <div className="flex justify-end gap-2 pt-2">
@@ -245,6 +355,40 @@ export default function AddSalePage() {
           </div>
         </form>
       </CardContent>
+
+      <Dialog open={brandDialogIndex !== null} onOpenChange={(open) => !open && setBrandDialogIndex(null)}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="h-4 w-4" /> Tambah Merek Baru
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>Nama Merek</Label>
+            <Input
+              autoFocus
+              value={newBrandName}
+              onChange={(e) => setNewBrandName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleSaveBrand();
+                }
+              }}
+              placeholder='Contoh: Cap Roda Mas'
+            />
+            <p className="text-xs text-muted-foreground">
+              Merek tersimpan di master dan langsung terpilih pada item ini.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setBrandDialogIndex(null)}>Batal</Button>
+            <Button type="button" onClick={handleSaveBrand} disabled={savingBrand || !newBrandName.trim()}>
+              {savingBrand ? "Menyimpan..." : "Simpan Merek"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

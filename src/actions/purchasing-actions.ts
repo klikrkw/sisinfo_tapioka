@@ -40,7 +40,6 @@ export async function getFinishedPurchasesPaginated(page: number, limit: number,
       date: purchases.date,
       productName: products.name,
       productUnit: products.unit,
-      brand: purchases.brand,
       netWeight: purchases.netWeight,
       payableWeight: purchases.payableWeight,
       sackCount: purchases.sackCount,
@@ -230,7 +229,6 @@ export async function createPurchaseTransaction(formData: {
   date: string;
   supplierId: number;
   rawMaterialId: number;
-  brand?: string;
   warehouseId: number;
   grossWeight: number;
   tareWeight: number;
@@ -268,7 +266,6 @@ export async function createPurchaseTransaction(formData: {
       date: new Date(formData.date),
       supplierId: formData.supplierId,
       rawMaterialId: formData.rawMaterialId,
-      brand: formData.brand?.trim() ? formData.brand.trim() : null,
       warehouseId: formData.warehouseId,
       grossWeight: String(formData.grossWeight),
       tareWeight: String(formData.tareWeight),

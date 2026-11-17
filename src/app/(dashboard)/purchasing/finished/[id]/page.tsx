@@ -42,7 +42,6 @@ export default function FinishedPurchaseDetailPage({ params }: { params: Promise
       date: String(purchase.date ?? ""),
       supplierName,
       materialName: product?.name ?? "-",
-      brand: purchase.brand ?? undefined,
       grossWeight: Number(purchase.grossWeight),
       tareWeight: Number(purchase.tareWeight),
       netWeight: Number(purchase.netWeight),
@@ -88,7 +87,6 @@ export default function FinishedPurchaseDetailPage({ params }: { params: Promise
           <p className="text-sm text-muted-foreground">
             {new Date(purchase.date).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })} · {supplierName}
             {product?.name ? ` · ${product.name}` : ""}
-            {purchase.brand ? ` — ${purchase.brand}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -137,10 +135,6 @@ export default function FinishedPurchaseDetailPage({ params }: { params: Promise
           <Table>
             <TableBody>
               <TableRow><TableCell className="text-muted-foreground">Produk</TableCell><TableCell className="text-right font-medium">{product?.name ?? "-"}</TableCell></TableRow>
-              <TableRow>
-                <TableCell className="text-muted-foreground">Merek / Brand</TableCell>
-                <TableCell className="text-right font-medium">{purchase.brand || "-"}</TableCell>
-              </TableRow>
               <TableRow><TableCell className="text-muted-foreground">Gudang Tujuan</TableCell><TableCell className="text-right">{warehouseName}</TableCell></TableRow>
               <TableRow><TableCell className="text-muted-foreground">Berat Timbang</TableCell><TableCell className="text-right font-mono">{Number(purchase.grossWeight).toLocaleString("id-ID")} Kg</TableCell></TableRow>
               <TableRow><TableCell className="text-muted-foreground">Berat Tara</TableCell><TableCell className="text-right font-mono">{Number(purchase.tareWeight).toLocaleString("id-ID")} Kg</TableCell></TableRow>

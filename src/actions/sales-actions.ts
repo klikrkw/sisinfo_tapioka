@@ -1,10 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { sales, saleItems, stockMovements, receivablePayments, cashTransactions, customers } from "@/db/schema";
+import { sales, saleItems, stockMovements, receivablePayments, cashTransactions, customers, brands } from "@/db/schema";
 import { getProductUnitCosts } from "./costing-actions";
 import { consumeStockFifo } from "@/lib/inventory/layers";
-import { eq, desc, like, and, ne, isNull } from "drizzle-orm";
+import { eq, desc, like, and, ne, isNull, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { generateDocumentNumber } from "@/actions/numbering-actions";
 
@@ -59,9 +59,19 @@ export async function createSale(data: {
   paymentMethod: "Cash" | "Transfer" | "Credit";
   termDays: number;
   notes?: string;
-  items: { productId: number; quantity: number; price: number; discount: number }[];
+  items: { productId: number; quantity: number; weight?: number | null; price: number; discount: number; brandId?: number | null }[];
 }) {
-  const totalAmount = data.items.reduce((acc, i) => acc + i.quantity * i.price - i.discount, 0);
+  /**
+   * Dasar hitung harga: jumlah berat (qty x berat per satuan).
+   * Bila berat belum diisi, dipakai qty (mis. penjualan tanpa timbang).
+   */
+  const itemSubtotal = (item: { quantity: number; weight?: number | null; price: number; discount: number }) => {
+    const totalWeight = Number(item.weight) > 0 ? item.quantity * Number(item.weight) : 0;
+    const basis = totalWeight > 0 ? totalWeight : item.quantity;
+    return basis * item.price - item.discount;
+  };
+
+  const totalAmount = data.items.reduce((acc, i) => acc + itemSubtotal(i), 0);
   const dueDate = data.paymentMethod === "Credit"
     ? new Date(new Date(data.date).getTime() + data.termDays * 86400000)
     : null;
@@ -69,6 +79,15 @@ export async function createSale(data: {
   // HPP dibekukan saat transaksi dibuat agar margin historis tidak berubah.
   const costMap = await getProductUnitCosts();
   const costFor = (productId: number) => costMap[productId];
+
+  // Nama merek diambil dari master agar snapshot yang disimpan konsisten.
+  const brandIds = Array.from(
+    new Set(data.items.map((i) => i.brandId).filter((id): id is number => typeof id === "number" && id > 0))
+  );
+  const brandRows = brandIds.length
+    ? await db.select().from(brands).where(inArray(brands.id, brandIds))
+    : [];
+  const brandNameById = new Map(brandRows.map((b) => [b.id, b.name]));
 
   try {
     await db.transaction(async (tx) => {
@@ -101,12 +120,19 @@ export async function createSale(data: {
     const saleId = Number(res.insertId);
 
     for (const item of data.items) {
-      const subtotal = item.quantity * item.price - item.discount;
+      const subtotal = itemSubtotal(item);
       const fallbackCost = costFor(item.productId);
       const [itemRes] = await tx.insert(saleItems).values({
         saleId,
         productId: item.productId,
+        brandId: item.brandId ?? null,
+        brandName: item.brandId ? brandNameById.get(item.brandId) ?? null : null,
         quantity: String(item.quantity),
+        weight: item.weight !== undefined && item.weight !== null && Number(item.weight) > 0 ? String(item.weight) : null,
+        totalWeight:
+          item.weight !== undefined && item.weight !== null && Number(item.weight) > 0
+            ? String(item.quantity * Number(item.weight))
+            : null,
         price: String(item.price),
         discount: String(item.discount),
         subtotal: String(subtotal),

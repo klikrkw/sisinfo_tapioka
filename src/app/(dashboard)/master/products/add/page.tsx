@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitSelect } from "@/components/master/unit-select";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useEffect } from "react";
 
 export default function AddProductPage() {
   const router = useRouter();
-  const { register, handleSubmit, setValue } = useForm({
+  const { register, handleSubmit, setValue, watch } = useForm({
     defaultValues: { type: "RAW_MATERIAL", unit: "Kg", code: "", name: "", brand: "", defaultPrice: "" }
   });
 
@@ -55,7 +56,7 @@ export default function AddProductPage() {
             <Label>Merek / Brand (opsional)</Label>
             <Input {...register("brand")} placeholder='Contoh: Cap Roda Mas' />
             <p className="mt-1 text-xs text-muted-foreground">
-              Merek dagang produk jadi, tampil pada pembelian &amp; surat jalan.
+              Merek dagang / cap produk, dipakai sebagai identitas di master produk.
             </p>
           </div>
           <div>
@@ -72,7 +73,11 @@ export default function AddProductPage() {
           </div>
           <div>
             <Label>Satuan</Label>
-            <Input {...register("unit", { required: true })} placeholder="Kg / Sak / Pcs" />
+            <UnitSelect
+              value={watch("unit") || ""}
+              onChange={(v) => setValue("unit", v, { shouldValidate: true })}
+            />
+            <input type="hidden" {...register("unit", { required: true })} />
           </div>
           <div>
             <Label>Harga Default (Rp)</Label>

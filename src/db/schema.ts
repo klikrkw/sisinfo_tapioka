@@ -40,6 +40,20 @@ export const suppliers = mysqlTable("suppliers", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const brands = mysqlTable("brands", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 100 }).notNull().unique(),
+  status: boolean("status").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const units = mysqlTable("units", {
+  id: serial("id").primaryKey(),
+  name: varchar("name", { length: 30 }).notNull().unique(),
+  status: boolean("status").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const products = mysqlTable("products", {
   id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
@@ -261,8 +275,14 @@ export const saleItems = mysqlTable("sale_items", {
   id: serial("id").primaryKey(),
   saleId: int("sale_id").notNull(),
   productId: int("product_id").notNull(),
+  brandId: int("brand_id"),
+  brandName: varchar("brand_name", { length: 100 }),
   batchId: int("batch_id"),
   quantity: decimal("quantity", { precision: 15, scale: 2 }).notNull(),
+  /** Berat per satuan (Kg), mis. 50 Kg/sak. */
+  weight: decimal("weight", { precision: 15, scale: 2 }),
+  /** Jumlah berat = qty x berat per satuan (Kg). */
+  totalWeight: decimal("total_weight", { precision: 15, scale: 2 }),
   price: decimal("price", { precision: 15, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 15, scale: 2 }).default("0"),
   subtotal: decimal("subtotal", { precision: 15, scale: 2 }).notNull(),

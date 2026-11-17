@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UnitSelect } from "@/components/master/unit-select";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useEffect, use } from "react";
@@ -17,7 +18,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
   const id = Number(resolvedParams.id);
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { register, handleSubmit, reset } = useForm();
+  const { register, handleSubmit, reset, watch, setValue } = useForm();
 
   const { data: product, isLoading } = useQuery({
     queryKey: ["product", id],
@@ -89,7 +90,7 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
             <Label>Merek / Brand (opsional)</Label>
             <Input {...register("brand")} placeholder='Contoh: Cap Roda Mas' />
             <p className="mt-1 text-xs text-muted-foreground">
-              Merek dagang produk jadi, tampil pada pembelian &amp; surat jalan.
+              Merek dagang / cap produk, dipakai sebagai identitas di master produk.
             </p>
           </div>
           <div>
@@ -106,7 +107,11 @@ export default function EditProductPage({ params }: { params: Promise<{ id: stri
           </div>
           <div>
             <Label>Satuan</Label>
-            <Input {...register("unit", { required: true })} />
+            <UnitSelect
+              value={(watch("unit") as string) || ""}
+              onChange={(v) => setValue("unit", v, { shouldValidate: true })}
+            />
+            <input type="hidden" {...register("unit", { required: true })} />
           </div>
           <div>
             <Label>Harga Default (Rp)</Label>

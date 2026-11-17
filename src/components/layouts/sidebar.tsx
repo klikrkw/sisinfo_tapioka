@@ -30,6 +30,8 @@ import {
   ChevronDown,
   Leaf,
   Layers,
+  Tag,
+  Ruler,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -56,6 +58,8 @@ const navItems: NavItem[] = [
       { label: "Armada / Truk", href: "/master/fleet", icon: Truck },
       { label: "Sopir", href: "/master/fleet/drivers", icon: Users },
       { label: "Jenis Potongan", href: "/master/deductions", icon: Tags },
+      { label: "Merek", href: "/master/brands", icon: Tag },
+      { label: "Satuan", href: "/master/units", icon: Ruler },
     ],
   },
   {

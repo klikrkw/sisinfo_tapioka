@@ -42,8 +42,6 @@ export default function SuratJalanPage({ params }: { params: Promise<{ id: strin
   const productName = (pid: number) => products?.find((p) => p.id === pid)?.name ?? `#${pid}`;
   const productUnit = (pid: number) => products?.find((p) => p.id === pid)?.unit ?? "Kg";
 
-  const totalQty = sale.items.reduce((a, it) => a + Number(it.quantity), 0);
-
   return (
     <>
       {/* Toolbar (tidak tercetak) */}
@@ -67,32 +65,42 @@ export default function SuratJalanPage({ params }: { params: Promise<{ id: strin
       {/* Dokumen Surat Jalan */}
       <div className="mx-auto max-w-[210mm] rounded-lg bg-white p-8 text-black shadow-sm print:max-w-none print:rounded-none print:p-0 print:shadow-none">
         {/* Kop Surat */}
-        <div className="border-b-2 border-gray-800 pb-3">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800 text-white">
-                <Leaf className="h-6 w-6" />
-              </span>
-              <div>
-                <h1 className="text-2xl font-bold uppercase tracking-wide">{company?.name ?? "Perusahaan Tapioka"}</h1>
-                <p className="text-xs text-gray-700">{company?.address ?? "Alamat perusahaan"}</p>
-                <p className="text-xs text-gray-700">
-                  {[company?.phone, company?.email].filter(Boolean).join(" · ") || "Telepon / Email"}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              <h2 className="text-xl font-bold uppercase tracking-wide">Surat Jalan</h2>
-              <p className="font-mono text-sm">{docNumber}</p>
+        <div className="flex items-start justify-between gap-4 border-b-2 border-gray-800 pb-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800 text-white">
+              <Leaf className="h-6 w-6" />
+            </span>
+            <div>
+              <h1 className="text-2xl font-bold uppercase tracking-wide">{company?.name ?? "Perusahaan Tapioka"}</h1>
+              <p className="text-xs text-gray-700">{company?.address ?? "Alamat perusahaan"}</p>
               <p className="text-xs text-gray-700">
-                {saleDate.toLocaleDateString("id-ID", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+                {[company?.phone, company?.email].filter(Boolean).join(" · ") || "Telepon / Email"}
               </p>
             </div>
           </div>
+          <div className="text-right">
+            <p className="font-mono text-sm font-semibold">{docNumber}</p>
+            <p className="text-xs text-gray-700">Invoice {sale.number}</p>
+          </div>
+        </div>
+
+        {/* Judul & info pengiriman */}
+        <h2 className="mt-4 text-center text-xl font-bold uppercase tracking-[0.3em]">Surat Jalan</h2>
+        <div className="mt-3 space-y-0.5 text-sm">
+          <p>
+            <span className="inline-block w-40">Tanggal Pengiriman</span>:{" "}
+            <span className="font-semibold">
+              {saleDate.toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })}
+            </span>
+          </p>
+          <p>
+            <span className="inline-block w-40">Nomor Polisi</span>:{" "}
+            <span className="font-semibold uppercase">{shipment?.vehiclePolice ?? "-"}</span>
+          </p>
         </div>
 
         {/* Info Pengiriman */}
-        <div className="mt-5 grid grid-cols-2 gap-6 text-sm">
+        <div className="mt-4 grid grid-cols-2 gap-6 text-sm">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Kepada Yth.</p>
             <p className="mt-1 font-semibold">{customer?.name ?? "-"}</p>
@@ -100,20 +108,12 @@ export default function SuratJalanPage({ params }: { params: Promise<{ id: strin
             {customer?.phone && <p className="text-xs text-gray-700">Telp: {customer.phone}</p>}
           </div>
           <div className="space-y-1 text-xs">
-            <div className="flex justify-between gap-3">
-              <span className="text-gray-500">No. Invoice</span>
-              <span className="font-mono font-medium">{sale.number}</span>
-            </div>
             {shipment?.number && (
               <div className="flex justify-between gap-3">
                 <span className="text-gray-500">No. Pengiriman</span>
                 <span className="font-mono font-medium">{shipment.number}</span>
               </div>
             )}
-            <div className="flex justify-between gap-3">
-              <span className="text-gray-500">No. Polisi</span>
-              <span className="font-medium">{shipment?.vehiclePolice ?? "-"}</span>
-            </div>
             <div className="flex justify-between gap-3">
               <span className="text-gray-500">Sopir</span>
               <span className="font-medium">{shipment?.driverName ?? "-"}</span>
@@ -128,30 +128,58 @@ export default function SuratJalanPage({ params }: { params: Promise<{ id: strin
         {/* Tabel Barang */}
         <table className="mt-5 w-full border-collapse text-sm">
           <thead>
-            <tr className="border-y-2 border-gray-800 text-left">
-              <th className="w-10 py-2">No</th>
-              <th className="py-2">Nama Barang</th>
-              <th className="w-24 py-2 text-right">Qty</th>
-              <th className="w-20 py-2 text-left">Satuan</th>
-              <th className="w-40 py-2">Keterangan</th>
+            <tr className="bg-gray-100 text-center">
+              <th className="w-10 border border-gray-800 px-2 py-2 text-center font-bold">No.</th>
+              <th className="border border-gray-800 px-2 py-2 text-left font-bold">Nama Barang</th>
+              <th className="w-24 border border-gray-800 px-2 py-2 font-bold">QTY</th>
+              <th className="w-20 border border-gray-800 px-2 py-2 font-bold">Berat Kg</th>
+              <th className="w-28 border border-gray-800 px-2 py-2 font-bold">Jumlah Berat</th>
+              <th className="w-28 border border-gray-800 px-2 py-2 font-bold">Harga</th>
+              <th className="w-36 border border-gray-800 px-2 py-2 font-bold">TOTAL HARGA</th>
             </tr>
           </thead>
           <tbody>
-            {sale.items.map((it, idx) => (
-              <tr key={it.id} className="border-b border-gray-300">
-                <td className="py-2">{idx + 1}</td>
-                <td className="py-2">{productName(it.productId)}</td>
-                <td className="py-2 text-right font-mono">{Number(it.quantity).toLocaleString("id-ID")}</td>
-                <td className="py-2">{productUnit(it.productId)}</td>
-                <td className="py-2"></td>
-              </tr>
-            ))}
+            {sale.items.map((it, idx) => {
+              const packetWeight = Number(it.weight || 0);
+              const lineWeightKg = Number(
+                it.totalWeight ?? Number(it.weight || 0) * Number(it.quantity)
+              );
+              return (
+                <tr key={it.id} className="align-top">
+                  <td className="border border-gray-800 px-2 py-2 text-center">{idx + 1}.</td>
+                  <td className="border border-gray-800 px-2 py-2">
+                    <span className="font-medium">{productName(it.productId)}</span>
+                    {it.brandName && (
+                      <span className="block italic">“{it.brandName}”</span>
+                    )}
+                  </td>
+                  <td className="border border-gray-800 px-2 py-2 text-center">
+                    {Number(it.quantity).toLocaleString("id-ID")} {productUnit(it.productId)}
+                  </td>
+                  <td className="border border-gray-800 px-2 py-2 text-center">
+                    {packetWeight > 0 ? `${packetWeight.toLocaleString("id-ID")} Kg` : "-"}
+                  </td>
+                  <td className="border border-gray-800 px-2 py-2 text-center">
+                    {lineWeightKg > 0
+                      ? `${(lineWeightKg / 1000).toLocaleString("id-ID", { maximumFractionDigits: 3 })} Ton`
+                      : "-"}
+                  </td>
+                  <td className="border border-gray-800 px-2 py-2 text-right font-mono">
+                    Rp {Number(it.price).toLocaleString("id-ID")}
+                  </td>
+                  <td className="border border-gray-800 px-2 py-2 text-right font-mono font-semibold">
+                    Rp {Number(it.subtotal).toLocaleString("id-ID")}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
           <tfoot>
-            <tr className="border-t-2 border-gray-800">
-              <td colSpan={2} className="py-2 text-right text-xs font-bold uppercase">Total</td>
-              <td className="py-2 text-right font-mono font-bold">{totalQty.toLocaleString("id-ID")}</td>
-              <td colSpan={2}></td>
+            <tr className="font-bold">
+              <td colSpan={6} className="border border-gray-800 px-2 py-2 text-right uppercase">Total</td>
+              <td className="border border-gray-800 px-2 py-2 text-right font-mono">
+                Rp {Number(sale.totalAmount).toLocaleString("id-ID")}
+              </td>
             </tr>
           </tfoot>
         </table>

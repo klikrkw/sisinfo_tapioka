@@ -79,7 +79,7 @@ Hanya item dengan `cost_source` kosong yang diisi; snapshot yang sudah ada tidak
 
 | Layar | Tampilan |
 |---|---|
-| Penjualan → Tambah | Per baris item: label sumber HPP, `Rp X/Kg`, margin per Kg, dan peringatan bila harga jual di bawah HPP |
+| Penjualan → Tambah | Per baris item: label sumber HPP, `Rp X/Kg`, margin per Kg, dan peringatan bila harga jual di bawah HPP; pilihan **Merek** (bisa tambah merek baru) |
 | Penjualan → Detail | Kolom **HPP/Kg** dan **Margin** per item + baris total estimasi HPP/margin |
 | Laporan → Laba / Rugi | Baris **HPP Produk Jadi Dibeli (Terjual)** = Σ HPP item (snapshot), dikurangkan dari laba kotor |
 

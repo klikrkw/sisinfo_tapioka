@@ -111,7 +111,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
           <CardHeader><CardTitle>Item Penjualan</CardTitle></CardHeader>
           <CardContent>
             <Table>
-              <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="text-right">Diskon</TableHead><TableHead className="text-right">Subtotal</TableHead><TableHead className="text-right">HPP/Kg</TableHead><TableHead className="text-right">Margin</TableHead></TableRow></TableHeader>
+              <TableHeader><TableRow><TableHead>Produk</TableHead><TableHead>Merek</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Berat/Satuan (Kg)</TableHead><TableHead className="text-right">Jumlah Berat (Kg)</TableHead><TableHead className="text-right">Harga</TableHead><TableHead className="text-right">Diskon</TableHead><TableHead className="text-right">Subtotal</TableHead><TableHead className="text-right">HPP/Kg</TableHead><TableHead className="text-right">Margin</TableHead></TableRow></TableHeader>
               <TableBody>
                 {sale.items.map((it) => {
                   const cost = itemCost(it);
@@ -119,7 +119,14 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
                   return (
                     <TableRow key={it.id}>
                       <TableCell className="font-medium">{productName(it.productId)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{it.brandName || "-"}</TableCell>
                       <TableCell className="text-right font-mono">{Number(it.quantity).toLocaleString("id-ID")}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        {it.weight ? Number(it.weight).toLocaleString("id-ID") : "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {Number(it.totalWeight ?? (Number(it.weight || 0) * Number(it.quantity))).toLocaleString("id-ID")}
+                      </TableCell>
                       <TableCell className="text-right font-mono">{formatRp(Number(it.price))}</TableCell>
                       <TableCell className="text-right font-mono">{formatRp(Number(it.discount))}</TableCell>
                       <TableCell className="text-right font-mono font-semibold">{formatRp(Number(it.subtotal))}</TableCell>
@@ -133,7 +140,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
                   );
                 })}
                 <TableRow>
-                  <TableCell colSpan={4} className="text-right text-xs text-muted-foreground">Estimasi HPP / Margin</TableCell>
+                  <TableCell colSpan={7} className="text-right text-xs text-muted-foreground">Estimasi HPP / Margin</TableCell>
                   <TableCell className="text-right font-mono font-semibold">{formatRp(Number(sale.totalAmount))}</TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatRp(Math.round(totalCogs))}</TableCell>
                   <TableCell className={`text-right font-mono font-bold ${totalMargin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
@@ -143,7 +150,15 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
               </TableBody>
             </Table>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              HPP/Kg dibekukan saat transaksi dibuat (snapshot), sehingga margin historis tidak berubah walau harga beli berubah.
+              Total berat:{" "}
+              {sale.items
+                .reduce((a, it) => a + Number(it.totalWeight ?? Number(it.weight || 0) * Number(it.quantity)), 0)
+                .toLocaleString("id-ID", { maximumFractionDigits: 2 })}{" "}
+              Kg ≈{" "}
+              {(
+                sale.items.reduce((a, it) => a + Number(it.totalWeight ?? Number(it.weight || 0) * Number(it.quantity)), 0) / 1000
+              ).toLocaleString("id-ID", { maximumFractionDigits: 3 })}{" "}
+              Ton · HPP/Kg dibekukan saat transaksi dibuat (snapshot), sehingga margin historis tidak berubah walau harga beli berubah.
               Transaksi lama tanpa snapshot memakai HPP terkini sebagai estimasi.
             </p>
           </CardContent>

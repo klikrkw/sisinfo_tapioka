@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { FileText, TrendingUp, TrendingDown, BarChart3 } from "lucide-react";
+import { FileText, TrendingUp, TrendingDown, BarChart3, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function ReportsPage() {
@@ -17,6 +17,7 @@ export default function ReportsPage() {
   const cards = [
     { title: "Laporan Pembelian", desc: "Tanggal, supplier, berat, rifaksi, potongan, total", icon: FileText, href: "/purchasing" },
     { title: "Laporan Penjualan", desc: "Pelanggan, produk, qty, harga, diskon, total", icon: TrendingUp, href: "/sales" },
+    { title: "Laporan Penjualan per Merek", desc: "Qty, omzet, HPP, margin tiap merek", icon: Tag, href: "/reports/brand-sales" },
     { title: "Laporan Stok", desc: "Stok awal, masuk, keluar, saldo", icon: BarChart3, href: "/warehouse/movements" },
     { title: "Laporan HPP", desc: "Batch, input, output, yield, biaya, HPP", icon: BarChart3, href: "/production/hpp" },
     { title: "Laporan Laba Rugi", desc: "Penjualan, HPP, biaya, laba bersih", icon: TrendingDown, href: "/reports/profit-loss" },

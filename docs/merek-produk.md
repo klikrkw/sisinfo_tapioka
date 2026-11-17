@@ -3,13 +3,14 @@
 Dokumen ini menjelaskan dua cara memakai merek pada produk jadi, mis. **Tepung Tapioka "Cap Roda Mas"**,
 "Cap Bunga Surya", dan "Cap Jago Terbang", serta kapan sebaiknya memecah produk per merek.
 
-## 1. Merek sebagai atribut (cukup untuk nota)
+## 1. Merek sebagai atribut produk (cukup untuk identitas produk)
 
-- Isi **Master → Produk → Edit → Merek / Brand**.
-- Saat membuat **Pembelian Produk Jadi**, merek terisi otomatis dari produk dan bisa diubah.
-- Merek tersimpan sebagai snapshot di transaksi (`purchases.brand`), tampil di detail dan **Nota / PDF**.
+- Isi **Master → Merek** untuk daftar merek (dipakai di penjualan).
+- Isi **Master → Produk → Edit → Merek / Brand** untuk menandai merek produk.
+- Merek produk tampil di daftar produk; **pembelian tidak memakai field merek**
+  (merek pada pembelian diambil dari produk yang dipilih, tidak diinput manual).
 
-Cocok bila stok, HPP, dan penjualan tidak perlu dipisah per merek.
+Cocok bila stok dan HPP tidak perlu dipisah per merek.
 
 ## 2. Produk terpisah per merek (disarankan untuk stok & penjualan per merek)
 
@@ -52,13 +53,27 @@ Produk dengan kode yang sudah ada akan dilewati, jadi aman dijalankan berulang.
 1. **Harga default**: atur per merek bila berbeda (Master → Produk).
 2. **Stok lama** tetap berada di produk dasar. Pindahkan ke produk merek lewat
    **Warehouse → Penyesuaian (ADJUSTMENT)** sesuai fisik gudang.
-3. **Transaksi lama** tidak berubah: masih menunjuk produk dasar, dan merek yang
-   sudah tersimpan di `purchases.brand` tetap tampil di nota.
+3. **Transaksi lama** tidak berubah: masih menunjuk produk dasar (merek tidak dicatat di pembelian).
 4. Mulai sekarang, pilih produk merek yang sesuai di **Pembelian Produk Jadi**.
 5. Produk dasar boleh dinonaktifkan (bukan dihapus) setelah stoknya nol agar riwayat tetap utuh.
 
-## 4. Catatan teknis
+## 4. Merek pada penjualan
 
-- Kolom: `products.brand` dan `purchases.brand` (`VARCHAR(100)`, nullable).
-- Patch DB: `src/db/patches/2026-11-15_004_product_brand.sql` (`npm run db:patch`).
+- Master merek: **Master → Merek** (tambah / ubah / nonaktifkan).
+- Di **Penjualan → Tambah**, setiap item punya pilihan **Merek** yang diambil dari tabel `brands`.
+  Pilih `+ Tambah merek baru…` untuk membuat merek langsung dari form; merek langsung terpilih.
+- Merek disimpan sebagai snapshot di `sale_items.brand_id` + `sale_items.brand_name`,
+  sehingga riwayat tetap terbaca walau nama merek diubah kemudian.
+- Laporan: **Laporan → Laporan Penjualan per Merek** (qty, omzet, HPP, margin per merek),
+  dan kolom merek di detail penjualan.
+
+## 5. Catatan teknis
+
+- Kolom: `products.brand` (`VARCHAR(100)`, nullable). Kolom `purchases.brand` sudah tidak dipakai
+  (disimpan hanya untuk data lama).
+- Master merek: tabel `brands` (`id`, `name` unik, `status`).
+- Merek penjualan: `sale_items.brand_id` + `sale_items.brand_name` (snapshot nama).
+- Laporan: **Laporan → Laporan Penjualan per Merek**.
+- Patch DB: `src/db/patches/2026-11-15_004_product_brand.sql` dan
+  `src/db/patches/2026-11-15_007_brands.sql` (`npm run db:patch`).
 - Seed: `src/db/seed-brands.ts` (`npm run db:seed-brands`).
