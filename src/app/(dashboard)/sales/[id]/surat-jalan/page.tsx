@@ -67,9 +67,18 @@ export default function SuratJalanPage({ params }: { params: Promise<{ id: strin
         {/* Kop Surat */}
         <div className="flex items-start justify-between gap-4 border-b-2 border-gray-800 pb-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800 text-white">
-              <Leaf className="h-6 w-6" />
-            </span>
+            {company?.logo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={company.logo}
+                alt={`Logo ${company?.name ?? "perusahaan"}`}
+                className="h-14 w-14 shrink-0 object-contain print:h-14 print:w-14"
+              />
+            ) : (
+              <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-800 text-white print:bg-gray-800 print:text-white">
+                <Leaf className="h-6 w-6" />
+              </span>
+            )}
             <div>
               <h1 className="text-2xl font-bold uppercase tracking-wide">{company?.name ?? "Perusahaan Tapioka"}</h1>
               <p className="text-xs text-gray-700">{company?.address ?? "Alamat perusahaan"}</p>

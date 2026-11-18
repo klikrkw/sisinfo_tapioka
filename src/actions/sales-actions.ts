@@ -1,12 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { sales, saleItems, stockMovements, receivablePayments, cashTransactions, customers, brands } from "@/db/schema";
+import { sales, saleItems, stockMovements, receivablePayments, cashTransactions, customers, brands, shipments } from "@/db/schema";
 import { getProductUnitCosts } from "./costing-actions";
 import { consumeStockFifo } from "@/lib/inventory/layers";
 import { eq, desc, like, and, ne, isNull, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { generateDocumentNumber } from "@/actions/numbering-actions";
+import { generateDocumentNumber, generateCustomDocumentNumber } from "@/actions/numbering-actions";
 
 export async function getSalesPaginated(page: number, limit: number, search?: string) {
   const offset = (page - 1) * limit;
@@ -59,8 +59,24 @@ export async function createSale(data: {
   paymentMethod: "Cash" | "Transfer" | "Credit";
   termDays: number;
   notes?: string;
+  vehicleId?: number | null;
+  driverId?: number | null;
+  destination?: string;
   items: { productId: number; quantity: number; weight?: number | null; price: number; discount: number; brandId?: number | null }[];
 }) {
+  /**
+   * Normalisasi input: field kosong dari form bisa menjadi NaN/undefined,
+   * sehingga semua angka dipaksa valid agar total tidak menjadi NaN.
+   */
+  const items = (data.items ?? []).map((i) => ({
+    ...i,
+    productId: Number(i.productId) || 0,
+    quantity: Number(i.quantity) || 0,
+    weight: Number(i.weight) > 0 ? Number(i.weight) : null,
+    price: Number(i.price) || 0,
+    discount: Number(i.discount) || 0,
+  }));
+
   /**
    * Dasar hitung harga: jumlah berat (qty x berat per satuan).
    * Bila berat belum diisi, dipakai qty (mis. penjualan tanpa timbang).
@@ -71,9 +87,12 @@ export async function createSale(data: {
     return basis * item.price - item.discount;
   };
 
-  const totalAmount = data.items.reduce((acc, i) => acc + itemSubtotal(i), 0);
+  const totalAmount = items.reduce((acc, i) => acc + itemSubtotal(i), 0);
+  if (!Number.isFinite(totalAmount) || items.length === 0) {
+    throw new Error("Total penjualan tidak valid. Periksa qty, berat, dan harga item.");
+  }
   const dueDate = data.paymentMethod === "Credit"
-    ? new Date(new Date(data.date).getTime() + data.termDays * 86400000)
+    ? new Date(new Date(data.date).getTime() + (data.termDays || 0) * 86400000)
     : null;
 
   // HPP dibekukan saat transaksi dibuat agar margin historis tidak berubah.
@@ -82,17 +101,21 @@ export async function createSale(data: {
 
   // Nama merek diambil dari master agar snapshot yang disimpan konsisten.
   const brandIds = Array.from(
-    new Set(data.items.map((i) => i.brandId).filter((id): id is number => typeof id === "number" && id > 0))
+    new Set(items.map((i) => i.brandId).filter((id): id is number => typeof id === "number" && id > 0))
   );
   const brandRows = brandIds.length
     ? await db.select().from(brands).where(inArray(brands.id, brandIds))
     : [];
   const brandNameById = new Map(brandRows.map((b) => [b.id, b.name]));
 
+  // Pengiriman otomatis dibuat bila armada & sopir dipilih pada form penjualan.
+  const hasShipment = Boolean(data.vehicleId && data.driverId);
+  const shipmentNumber = hasShipment ? await generateCustomDocumentNumber("SHIPMENT", "DO") : null;
+
   try {
     await db.transaction(async (tx) => {
       // Validate stock before posting
-      for (const item of data.items) {
+      for (const item of items) {
         const last = await tx
           .select()
           .from(stockMovements)
@@ -119,7 +142,23 @@ export async function createSale(data: {
     });
     const saleId = Number(res.insertId);
 
-    for (const item of data.items) {
+    // Pengiriman (armada + sopir + tujuan) langsung ditautkan ke penjualan.
+    if (hasShipment && shipmentNumber) {
+      await tx.insert(shipments).values({
+        number: shipmentNumber,
+        date: new Date(data.date),
+        saleId,
+        vehicleId: Number(data.vehicleId),
+        driverId: Number(data.driverId),
+        destination: data.destination?.trim() ? data.destination.trim() : null,
+        kmStart: "0",
+        kmEnd: "0",
+        distance: "0",
+        status: "Disiapkan",
+      });
+    }
+
+    for (const item of items) {
       const subtotal = itemSubtotal(item);
       const fallbackCost = costFor(item.productId);
       const [itemRes] = await tx.insert(saleItems).values({
@@ -193,6 +232,7 @@ export async function createSale(data: {
 
     revalidatePath("/sales");
     revalidatePath("/warehouse");
+    if (hasShipment) revalidatePath("/fleet");
     return { success: true };
   } catch (e) {
     console.error("createSale failed:", e);

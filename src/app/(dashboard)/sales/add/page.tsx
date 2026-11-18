@@ -7,7 +7,7 @@ import { getDocumentSequences } from "@/actions/settings-actions";
 import { getProducts, getWarehouses } from "@/actions/master-actions";
 import { getStockBalances } from "@/actions/warehouse-actions";
 import { getProductUnitCosts } from "@/actions/costing-actions";
-import { getCustomers } from "@/actions/master-others";
+import { getCustomers, getVehicles, getDrivers } from "@/actions/master-others";
 import { getBrands, createBrand } from "@/actions/brand-actions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +44,9 @@ export default function AddSalePage() {
       warehouseId: "",
       paymentMethod: "Cash",
       termDays: 0,
+      vehicleId: "",
+      driverId: "",
+      destination: "",
       notes: "",
       items: [] as { productId: string; brandId: string; quantity: number; weight: number; price: number; discount: number }[],
     },
@@ -52,6 +55,8 @@ export default function AddSalePage() {
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
 
   const { data: customers } = useQuery({ queryKey: ["customers"], queryFn: getCustomers });
+  const { data: vehicles } = useQuery({ queryKey: ["vehicles"], queryFn: getVehicles });
+  const { data: drivers } = useQuery({ queryKey: ["drivers"], queryFn: getDrivers });
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: warehouses } = useQuery({ queryKey: ["warehouses"], queryFn: getWarehouses });
   const { data: stockBalances } = useQuery({ queryKey: ["stock-balances-all"], queryFn: () => getStockBalances() });
@@ -105,10 +110,50 @@ export default function AddSalePage() {
       toast.error("Pilih gudang terlebih dahulu");
       return;
     }
-    const over = (data.items || []).some((it: any) => {
+    if (Boolean(data.vehicleId) !== Boolean(data.driverId)) {
+      toast.error("Armada dan sopir harus dipilih bersamaan (atau biarkan kosong)");
+      return;
+    }
+
+    // Input kosong dari form menghasilkan NaN — normalkan dulu.
+    type SaleItemInput = {
+      productId: number;
+      brandId: number | null;
+      quantity: number;
+      weight: number | null;
+      price: number;
+      discount: number;
+    };
+    const items: SaleItemInput[] = (data.items || []).map((i: any) => ({
+      productId: Number(i.productId) || 0,
+      brandId: i.brandId ? Number(i.brandId) : null,
+      quantity: Number(i.quantity) || 0,
+      weight: Number(i.weight) > 0 ? Number(i.weight) : null,
+      price: Number(i.price) || 0,
+      discount: Number(i.discount) || 0,
+    }));
+
+    if (items.length === 0) {
+      toast.error("Tambahkan minimal satu item penjualan");
+      return;
+    }
+    if (items.some((i) => !i.productId)) {
+      toast.error("Ada item yang belum memilih produk");
+      return;
+    }
+    if (items.some((i) => i.quantity <= 0)) {
+      toast.error("Qty setiap item harus lebih dari 0");
+      return;
+    }
+    if (items.some((i) => i.price <= 0)) {
+      toast.error("Harga setiap item harus diisi");
+      return;
+    }
+
+    const over = items.some((it) => {
       const st = stockFor(it.productId);
       const available = st ? Number(st.balance) : 0;
-      return Number(it.quantity) > available;
+      return it.quantity > available;
     });
     if (over) {
       toast.error("Qty melebihi stok gudang yang tersedia");
@@ -122,16 +167,12 @@ export default function AddSalePage() {
         customerId: Number(data.customerId),
         warehouseId: Number(data.warehouseId),
         paymentMethod: data.paymentMethod,
-        termDays: Number(data.termDays),
+        termDays: Number(data.termDays) || 0,
+        vehicleId: data.vehicleId ? Number(data.vehicleId) : null,
+        driverId: data.driverId ? Number(data.driverId) : null,
+        destination: data.destination || undefined,
         notes: data.notes,
-        items: data.items.map((i: any) => ({
-          productId: Number(i.productId),
-          brandId: i.brandId ? Number(i.brandId) : null,
-          quantity: Number(i.quantity),
-          weight: i.weight ? Number(i.weight) : null,
-          price: Number(i.price),
-          discount: Number(i.discount),
-        })),
+        items,
       });
       if (!res.success) {
         toast.error(res.error);
@@ -174,7 +215,16 @@ export default function AddSalePage() {
             <div><Label>Tanggal</Label><Input type="date" {...register("date", { required: true })} /></div>
             <div>
               <Label>Pelanggan</Label>
-              <select className={selectClass} {...register("customerId", { required: true })}>
+              <select
+                className={selectClass}
+                {...register("customerId", {
+                  required: true,
+                  onChange: (e) => {
+                    const c = customers?.find((x) => String(x.id) === e.target.value);
+                    if (c?.address) setValue("destination", c.address);
+                  },
+                })}
+              >
                 <option value="">Pilih Pelanggan</option>
                 {customers?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
@@ -195,6 +245,31 @@ export default function AddSalePage() {
               </select>
             </div>
             <div><Label>Termin (hari)</Label><Input type="number" {...register("termDays")} /></div>
+            <div>
+              <Label>Armada / Truk</Label>
+              <select className={selectClass} {...register("vehicleId")}>
+                <option value="">Pilih Armada</option>
+                {vehicles?.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.policeNumber}{v.brand ? ` · ${v.brand}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label>Sopir</Label>
+              <select className={selectClass} {...register("driverId")}>
+                <option value="">Pilih Sopir</option>
+                {drivers?.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <Label>Tujuan Pengiriman</Label>
+              <Input {...register("destination")} placeholder="Alamat / kota tujuan pengiriman" />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Armada, sopir, dan tujuan akan otomatis dibuatkan surat jalan (DO) dan tampil di Surat Jalan.
+              </p>
+            </div>
           </div>
 
           <Separator />

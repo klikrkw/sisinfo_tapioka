@@ -5,6 +5,7 @@ import { getSaleById, recordReceivablePayment } from "@/actions/sales-actions";
 import { getProducts } from "@/actions/master-actions";
 import { getCompanySettings } from "@/actions/settings-actions";
 import { getProductUnitCosts } from "@/actions/costing-actions";
+import { getShipmentBySaleId } from "@/actions/fleet-actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +34,7 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
   const { data: products } = useQuery({ queryKey: ["products"], queryFn: getProducts });
   const { data: company } = useQuery({ queryKey: ["company-settings"], queryFn: getCompanySettings });
   const { data: costMap } = useQuery({ queryKey: ["product-unit-costs"], queryFn: getProductUnitCosts });
+  const { data: shipment } = useQuery({ queryKey: ["shipment-by-sale", saleId], queryFn: () => getShipmentBySaleId(saleId) });
 
   const payMutation = useMutation({
     mutationFn: () => recordReceivablePayment(saleId, Number(payAmount), payDate),
@@ -81,6 +83,12 @@ export default function SaleDetailPage({ params }: { params: Promise<{ id: strin
               {sale.deliveryNoteNumber ? ` · Surat Jalan ${sale.deliveryNoteNumber}` : ""}
               {sale.dueDate ? ` · Jatuh tempo ${new Date(sale.dueDate).toLocaleDateString("id-ID")}` : ""}
             </p>
+            {(shipment?.vehiclePolice || shipment?.driverName || shipment?.destination) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pengiriman {shipment?.number ?? ""} · Armada {shipment?.vehiclePolice ?? "-"} · Sopir {shipment?.driverName ?? "-"}
+                {shipment?.destination ? ` · Tujuan ${shipment.destination}` : ""}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Badge>{sale.status}</Badge>
